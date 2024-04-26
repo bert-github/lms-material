@@ -1,3 +1,81 @@
+4.5.1
+-----
+1. Fix now-playing and MAI backgrounds.
+
+4.5.0
+-----
+ 1. Add icons to release type and search headers.
+ 2. On desktop layout if click on link in now-playing or MAI that shows browse
+    view, then 'Go back' will go back to now-playing or MAI.
+ 3. If sorting tracks by 'title' then sub-sort by artist.
+ 4. Add material style image for random play in queue.
+ 5. Add support for Lyrion 9.0.0 'Works' feature.
+ 6. Add 'Shuffle' options to alarm dialog.
+ 7. Re-add some missing Russian translations.
+ 8. Always use name 'Lyrion'
+ 9. List album contributors in 'Information' page.
+10. Add 'Scroll to' action for artists with multiple release categories.
+11. Don't allow "fake" add/play-all for Qobuz playlists.
+12. 'header' support for SlimBrowse lists.
+13. Add 'appearance', 'collection', 'conductor', 'orchestra', 'remix', and
+    'work' release type icons.
+14. When getting release type icons try to map to a pre-supplied icon if
+    specific icon not found.
+15. Update queue settings when show or pin.
+16. Adjust now-playing background to prevent shadow/glow effect at edges, and
+    increase amount of blur.
+17. Use "0" as URL for alarm playlist if set to current queue.
+
+4.4.1
+-----
+ 1. Add 'dontTrapBack' URL query parameter. When passed Material will not
+    intercept browser's back button.
+ 2. Don't hide mobile bottom now-playing bar when keyboard shown.
+ 3. Fix Deezer icon mapping.
+ 4. Fix album cover in sub-toolbr when navigating into an album from 'More'
+ 5. Only show alarm details in toolbar/menu if active player has an alarm.
+ 6. When open player settings via alarm entry in player's menu then scroll
+    alarms section into view.
+ 7. Fix text alignment of text list items in browse view when 100 or more
+    items.
+ 8. Add 'Manage plugins' button to 'Information' dialog.
+ 9. Refer to LMS as 'Lyrion Music Server' for LMS 9.0 onwards.
+10. Revert 'Media sources' to 'Music sources', to match new LMS name.
+11. Fix handing of boolean URL query parameters when '1' is passed as value.
+
+4.4.0
+-----
+ 1. Use detailed subtoolbar for some online (e.g Spotty) artist and album
+    listings.
+ 2. Add server-side option to show composer, and not artist, for composer
+    genres in MAI.
+ 3. In desktop layout with un-pinned queue add a show/hide queue button in
+    bottom bar (if queue contains more than 1 track).
+ 4. For track style queue, show ratings on right underneath track time.
+ 5. Re-add zooming to MAI view.
+ 6. Get next alarm from status message (requires LMS8.5) and show in player
+    menu, toolbar, and in 'Manage players' dialog.
+ 7. When re-show group volume dialog use any previous volumes as defaults, to
+    improve initial display.
+ 8. Add release-type specific icons.
+ 9. When shrinking jumplist remove keys with fewest items.
+10. Allow adding Bandcamp, Deezer, Qobuz, Spotify, and Tidal tracks to
+    playlists.
+11. Update Deezer icon.
+12. Don't pass "sort:album" when adding an artist's albums to queue, as LMS
+    errors on this (and "album" is the default sort anyway).
+13. Remove mysqueezebox.com icon mapping.
+14. Use LMS's time format to determine if 12 or 24hr times should be used.
+
+4.3.4
+-----
+1. Try not to crop radio station logos in favourites.
+2. Fix missing icons from 'Extras' plugins if Material is set as default skin.
+3. Tweak queue toolbar layout.
+4. Always restore queue pinned and shown state as per settings, regardless of
+   window size.
+5. Update Axios to 1.6.7
+
 4.3.3
 -----
 1. When showing now-playing context menu reset favIcon and favUrl so that these

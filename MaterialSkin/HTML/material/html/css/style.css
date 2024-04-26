@@ -47,10 +47,12 @@
  --np-landscape-top-pad:calc((var(--np-landscape-item-height) - var(--np-image-landscape-size))/2);
  --mobile-scrollbar-thumb-color:transparent;
  --bgnd-filter:blur(7px);
+ --np-bgnd-filter-size:7px;
+ --np-bgnd-filter:blur(var(--np-bgnd-filter-size));
  --backdrop-filter:blur(4px);
  --toolbar-filter:blur(35px);
  --npbar-border-color:var(--bottom-toolbar-border-color);
- --album-separator-color:rgba(0, 0, 0, 0.2);
+ --album-separator-color:rgba(2, 2, 2, 0.2);
  --subtoolbar-image-url:url();
  --home-button-size:0px;
  --pq-current-color:rgba(var(--highlight-rgb),0.2);
@@ -67,12 +69,29 @@
  --pbar-colored-bgnd:rgba(220, 220, 220, 0.3);
  --50vh:calc(var(--vh, 1vh)*50);
  --100vh:calc(var(--vh, 1vh)*100);
+ --np-zoom:1.0;
+ --np-zoom-list:1.0;
 }
 
 /* For old browsers that dont support min() */
 @supports not (width: min(10px, 5vw)) {
  :root {
   --bottom-nav-pad:0px;
+ }
+}
+@media (min-width:800px) {
+ :root {
+  --np-bgnd-filter-size:9px;
+ }
+}
+@media (min-width:1000px) {
+ :root {
+  --np-bgnd-filter-size:10px;
+ }
+}
+@media (min-width:1500px) {
+ :root {
+  --np-bgnd-filter-size:12px;
  }
 }
 
@@ -117,6 +136,10 @@
 .browse-html a, .np-info-text a, .np-info-text-full a,
 .primary--text, a.primary--text, div.primary--text, i.primary--text, label.primary--text, .lms-link, .active, .clickable a {
  color:var(--active-color) !important;
+}
+
+.v-slider input {
+ cursor:pointer;
 }
 
 .v-slider .primary, .v-progress-linear .primary, .v-progress-circular .primary {
@@ -293,6 +316,18 @@ html, .mini-player {
 .v-list__tile__title, .v-select__selection, .v-select__selection--comma, .v-btn__content, html, .pq-albumstyle .v-list__tile {
  font-size:var(--std-font-size);
  font-weight:var(--std-weight);
+}
+
+.np-info .v-list__tile__title, .np-info .browse-header .v-list__tile__title, .np-info .grid-header .v-list__tile__title {
+ font-size:calc(var(--std-font-size) * var(--np-zoom-list)) !important;
+}
+
+.np-info .np-list-time {
+ font-size:calc(var(--small-font-size) * var(--np-zoom-list)) !important;
+}
+
+.np-info .rstar {
+ font-size:calc(14px * var(--np-zoom-list)) !important;
 }
 
 .v-list__tile__sub-title, .v-select__slot .v-label {
@@ -709,11 +744,11 @@ div.v-subheader {
 }
 
 .detailed-sub .lms-list .emblem, .detailed-sub .lms-list-jump .emblem {
- left:calc(96px + var(--home-button-size)) - var(--jump-list-adjust);
+ left:calc((100px + var(--home-button-size)) - var(--jump-list-adjust));
 }
 .indent-right .lms-list .emblem, .indent-right .lms-list-jump .emblem,
 .indent-both .lms-list .emblem, .indent-both .lms-list-jump .emblem {
- left:calc(192px + var(--home-button-size) - var(--jump-list-adjust));
+ left:calc((196px + var(--home-button-size)) - var(--jump-list-adjust));
 }
 
 .error-text {
@@ -1115,33 +1150,21 @@ div.v-subheader {
  height:unset!important;
 }
 
-.browse-text .v-list__tile__title {
+.browse-text .v-list__tile__title,
+.browse-text-inrecycler .v-list__tile__title {
  font-size:var(--std-font-size)!important;
  font-weight:200!important;
  white-space:normal!important;
  min-height:var(--list-elem-height)!important;
  height:auto!important;
- padding:12px 0px 11px 0px!important; /* t, r, b, l */
-}
-
-.browse-text-inrecycler .v-list__tile__title {
- font-size:var(--std-font-size)!important;
- font-weight:200!important;
- white-space:normal!important;
- height:var(--list-elem-height)!important;
  padding:0px!important;
+ text-align: left;
+ flex: 1 1 auto;
  overflow: hidden;
- display: -webkit-box;
- -webkit-box-orient: vertical;
- -webkit-line-clamp: 2;
-}
-
-.browse-text-inrecycler .v-list__tile__title:before {
- box-sizing:initial!important;
-};
-
-.v-list__tile:has(.browse-text-inrecycler) {
- padding:12px 0px 11px 0px!important; /* t, r, b, l */
+ display: flex;
+ align-items: flex-start;
+ justify-content: center;
+ flex-direction: column;
 }
 
 .browse-text, .browse-text-inrecycler, .browse-html, .selectable {
@@ -1160,9 +1183,10 @@ div.v-subheader {
 .np-bgnd {
  position:fixed;
  top:var(--main-toolbar-height);
- width:100vw;
- height:calc(var(--100vh) - (var(--main-toolbar-height) + var(--bottom-toolbar-height)));
+ width:calc(100vw + (4* var(--np-bgnd-filter-size)));
+ height:calc((var(--100vh) + (4* var(--np-bgnd-filter-size))) - (var(--main-toolbar-height) + var(--bottom-toolbar-height)));
  background-color:var(--background-color);
+ margin:calc(-1 * var(--np-bgnd-filter-size));
 }
 
 .np-image {
@@ -1171,6 +1195,7 @@ div.v-subheader {
  display:table;
  padding:var(--np-image-border);
  position:relative;
+ cursor: pointer;
 }
 
 .np-image .np-cover {
@@ -1317,6 +1342,7 @@ div.v-subheader {
  object-fit:contain;
  object-position:50% 50%;
  margin:auto;
+ cursor:pointer;
 }
 
 .np-mai-img {
@@ -1598,6 +1624,7 @@ div.v-rating i.primary--text, div.v-rating i.accent--text {
  border:none !important;
  overflow:hidden;
  background-color:var(--pbar-bgnd)!important;
+ cursor: pointer;
 }
 
 .np-slider .v-progress-linear__bar__determinate {
@@ -1710,7 +1737,6 @@ div.v-rating i.primary--text, div.v-rating i.accent--text {
  max-width:1000px;
  margin-left:auto;
  margin-right:auto;
- font-size:var(--std-font-size)!important;
 }
 
 .np-info-text-full {
@@ -1719,10 +1745,7 @@ div.v-rating i.primary--text, div.v-rating i.accent--text {
  margin:auto;
 }
 
-.browse-html h1, .browse-html h2, .browse-html h3,
-.np-info-text h1, .np-info-text h2, .np-info-text h3,
-.np-info-text-full h1, .np-info-text-full h2, .np-info-text-full h3
- {
+.browse-html h1, .browse-html h2, .browse-html h3 {
  font-size:var(--std-font-size)!important;
 }
 
@@ -1738,7 +1761,7 @@ div.v-rating i.primary--text, div.v-rating i.accent--text {
  pointer-events:none;
 }
 
-progress {
+.progress {
  border:0;
 }
 
@@ -1805,8 +1828,8 @@ progress {
  background-size:cover !important;
  background-repeat:no-repeat !important;
  background-position:center top !important;
- filter:var(--bgnd-filter);
- -webkit-filter:var(--bgnd-filter);
+ filter:var(--np-bgnd-filter);
+ -webkit-filter:var(--np-bgnd-filter);
  box-shadow:inset 100vw 100vh var(--background-shadow-color);
  overflow:hidden;
 }
@@ -1922,6 +1945,28 @@ progress {
  margin-right:-28px;
  min-width:44px;
  margin-top:calc(19px - var(--std-font-size));
+}
+
+.pq-time-r {
+ min-width:62px;
+}
+.pq-rating {
+ position:fixed;
+ opacity:var(--sub-opacity);
+ right:19px;
+ bottom:-4px;
+}
+
+.pq-rating-3 {
+ bottom:5px;
+}
+
+#queue-view .pq-rating .v-icon {
+ width:14px !important;
+ height:14px !important;
+ font-size:14px !important;
+ padding:0px!important;
+ margin-left:-1.5px!important;
 }
 
 .browse-time {
@@ -2295,11 +2340,12 @@ div.v-subheader {
 }
 
 .rstar {
- font-size:var(--small-font-size);
+ font-size:14px!important;
  font-family:'Material Icons';
  font-weight:normal;
  font-style:normal;
  vertical-align:bottom;
+ letter-spacing:-1.5px;
 }
 
 .pointer {
@@ -2311,6 +2357,7 @@ div.v-subheader {
  line-height:22px;
  vertical-align:middle;
  padding-left:4px;
+ margin-top:-2px;
 }
 
 .lms-avatar .v-avatar {
@@ -2482,8 +2529,8 @@ div.v-subheader {
  margin-right:-8px;
 }
 
-.browse-header .v-list__tile__title, .grid-header .v-list__tile__title {
- color:var(--active-color);
+.browse-header .v-list__tile__title, .grid-header .v-list__tile__title, .browse-header .v-avatar--tile .v-icon, .grid-header .v-avatar--tile .v-icon {
+ color:var(--active-color) !important;
  font-weight:var(--bold-weight);
  font-size:var(--std-font-size) !important;
 }
@@ -2500,8 +2547,6 @@ div.v-subheader {
 
 .jl-divider {
  font-size:65%;
- background-color:var(--pq-current-color);
- border-radius: 4px;
  min-height:22px;
  max-height:32px;
 }
@@ -3333,7 +3378,7 @@ div.v-subheader {
 .v-tabs__div, .np-info .v-card__title p {
  text-transform:none!important;
  font-weight:var(--bold-weight)!important;
- font-size:var(--std-font-size)!important;
+ font-size:calc(var(--std-font-size) * var(--np-zoom)) !important;
 }
 .v-menu__content {
  border-radius:8px;
@@ -3493,6 +3538,7 @@ div.v-subheader {
 .context-button {
  margin-left:0px;
  padding:0 10px;
+ min-width:78px!important;
 }
 
 .context-button:not(:last-of-type) {
@@ -3527,4 +3573,91 @@ div.v-subheader {
  margin-right:8px;
  border-radius:4px;
  background-color:var(--image-background-color);
+}
+
+.np-info .v-card,
+.np-info .v-card__title p,
+.np-info-text,
+.np-info-text h1, .np-info-text h2, .np-info-text h3,
+.np-info-text-full h1, .np-info-text-full h2, .np-info-text-full h3 {
+ font-size:calc(var(--std-font-size) * var(--np-zoom)) !important;
+}
+
+/* Works images*/
+.image-grid-item .mi,
+.mi .v-avatar {
+  position: relative;
+  overflow: hidden;
+}
+.image-grid-item .mi {
+  width: 100%;
+  height: 100%;
+}
+
+.mi img {
+ position: absolute;
+ width: 100%;
+ height: 100%;
+ object-fit: cover;
+ object-position: center left;
+}
+
+.mi .mi-0 {
+ transform: translateX(-50%);
+}
+
+.mi2 .mi-1, .mi3 .mi-1 {
+ transform: translateX(-35%);
+}
+
+.mi3 .mi-2, .mi4 .mi-3 {
+ transform: translateX(-20%);
+}
+
+.mi4 .mi-1 {
+ transform: translateX(-40%);
+}
+
+.mi4 .mi-2 {
+ transform: translateX(-30%);
+}
+
+.mi .mi-1, .mi .mi-2, .mi .mi-3 {
+ /*mask-image: linear-gradient(to right, transparent 0px, black 12px); */
+ box-shadow: -5px 0px 25px 0px black;
+}
+
+.v-list__tile .mi .mi-1, .v-list__tile .mi .mi-2, .v-list__tile .mi .mi-3 {
+ /*mask-image: linear-gradient(to right, transparent 0px, black 6px);*/
+ box-shadow: -3px 0px 8px 0px black;
+}
+
+.v-list__tile .mi .mi-0 {
+ transform: translateX(0%);
+}
+
+.v-list__tile .mi .mi-1 {
+  transform: translateX(20%);
+}
+
+.v-list__tile .mi .mi-2 {
+ transform: translateX(40%);
+}
+
+.v-list__tile .mi4 .mi-1 {
+ transform: translateX(13.3%);
+}
+
+.v-list__tile .mi4 .mi-2 {
+ transform: translateX(26.7%);
+}
+
+.v-list__tile .mi4 .mi-3 {
+ transform: translateX(40%);
+}
+
+/* Set these to 100% height to work-around strange issue (Chromium Linux) where if list only has one
+   item then only the item's background is blurred, not the rest of the view??? */
+.single-item-list .vue-recycle-scroller, .single-item-list .vue-recycle-scroller.direction-vertical .vue-recycle-scroller__item-wrapper {
+ height:100%;
 }

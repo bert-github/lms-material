@@ -17,10 +17,15 @@ const STD_ITEM_ALBUM_TRACK = 7;
 const STD_ITEM_PLAYLIST_TRACK = 8;
 const STD_ITEM_REMOTE_PLAYLIST_TRACK = 9;
 const STD_ITEM_MUSICIP_MOOD = 10;
+const STD_ITEM_WORK = 11;
 const STD_ITEM_MIX = 101;
 const STD_ITEM_MAI = 200;
 const STD_ITEM_ALL_TRACKS = 201;
 const STD_ITEM_COMPOSITION_TRACKS = 202;
+const STD_ITEM_CLASSICAL_WORKS = 203;
+const STD_ITEM_ONLINE_ARTIST = 300;
+const STD_ITEM_ONLINE_ALBUM = 301;
+const STD_ITEM_ONLINE_ARTIST_CATEGORY = 302;
 
 const STD_ITEMS=[
     {
@@ -32,13 +37,13 @@ const STD_ITEMS=[
         command: ["albums"],
         params: [ARTIST_ALBUM_TAGS, SORT_KEY+ARTIST_ALBUM_SORT_PLACEHOLDER],
         menu: [PLAY_ACTION, INSERT_ACTION, PLAY_SHUFFLE_ACTION, ADD_ACTION, ADD_RANDOM_ALBUM_ACTION, DIVIDER, ADD_TO_FAV_ACTION, SELECT_ACTION, CUSTOM_ACTIONS, MORE_LIB_ACTION],
-        actionMenu: [DIVIDER, INSERT_ACTION, PLAY_SHUFFLE_ACTION, ADD_RANDOM_ALBUM_ACTION, DIVIDER, ADD_TO_FAV_ACTION, CUSTOM_ACTIONS, MORE_LIB_ACTION]
+        actionMenu: [DIVIDER, INSERT_ACTION, PLAY_SHUFFLE_ACTION, ADD_RANDOM_ALBUM_ACTION, DIVIDER, SCROLL_TO_ACTION, ADD_TO_FAV_ACTION, CUSTOM_ACTIONS, MORE_LIB_ACTION]
     },
     {
         command: ["tracks"],
         params: [TRACK_TAGS, SORT_KEY+"tracknum"],
         menu: [PLAY_ACTION, INSERT_ACTION, PLAY_SHUFFLE_ACTION, ADD_ACTION, DIVIDER, ADD_TO_FAV_ACTION, ADD_TO_PLAYLIST_ACTION, DOWNLOAD_ACTION, SELECT_ACTION, CUSTOM_ACTIONS, MORE_LIB_ACTION],
-        actionMenu: [INSERT_ACTION, PLAY_SHUFFLE_ACTION, DIVIDER, SCROLL_TO_DISC_ACTION, ADD_TO_FAV_ACTION, ADD_TO_PLAYLIST_ACTION, DOWNLOAD_ACTION, CUSTOM_ACTIONS, MORE_LIB_ACTION],
+        actionMenu: [INSERT_ACTION, PLAY_SHUFFLE_ACTION, DIVIDER, SCROLL_TO_ACTION, ADD_TO_FAV_ACTION, ADD_TO_PLAYLIST_ACTION, DOWNLOAD_ACTION, CUSTOM_ACTIONS, MORE_LIB_ACTION],
         searchMenu: [PLAY_ACTION, INSERT_ACTION, ADD_ACTION, DIVIDER, GOTO_ARTIST_ACTION, ADD_TO_FAV_ACTION, ADD_TO_PLAYLIST_ACTION, DOWNLOAD_ACTION, SELECT_ACTION, CUSTOM_ACTIONS, MORE_LIB_ACTION]
     },
     {
@@ -74,6 +79,12 @@ const STD_ITEMS=[
     },
     {
         menu: [PLAY_ACTION, INSERT_ACTION, ADD_ACTION, DIVIDER, ADD_TO_FAV_ACTION]
+    },
+    {
+        command: ["albums"],
+        params: [ALBUM_TAGS_PLACEHOLDER, SORT_KEY+ALBUM_SORT_PLACEHOLDER],
+        menu: [PLAY_ACTION, INSERT_ACTION, PLAY_SHUFFLE_ACTION, ADD_ACTION, ADD_RANDOM_ALBUM_ACTION, DIVIDER, ADD_TO_FAV_ACTION, SELECT_ACTION/*, CUSTOM_ACTIONS, MORE_LIB_ACTION*/],
+        actionMenu: [DIVIDER, INSERT_ACTION, PLAY_SHUFFLE_ACTION, ADD_RANDOM_ALBUM_ACTION, DIVIDER, ADD_TO_FAV_ACTION/*, CUSTOM_ACTIONS, MORE_LIB_ACTION*/]
     }
 ];
 
@@ -95,6 +106,8 @@ function buildStdItemCommand(item, parentCommand) {
                 command.params.push(list[i]);
             }
         }
+    } else if (stdItem>=STD_ITEM_ONLINE_ARTIST) {
+        return command;
     } else {
         if (undefined==STD_ITEMS[stdItem].command) {
             return command;
@@ -123,7 +136,7 @@ function buildStdItemCommand(item, parentCommand) {
                 }
             }
         }
-        command.params.push(item.id);
+        command.params.push(originalId(item.id));
     }
     if (undefined!=parentCommand) {
         if (item.id.startsWith("artist_id:")) {
@@ -155,12 +168,17 @@ function buildStdItemCommand(item, parentCommand) {
                         command.params.push(parentCommand.params[i]);
                     } else if (!LMS_NO_GENRE_FILTER && lower.startsWith("genre_id:")) {
                         command.params.push(parentCommand.params[i]);
+                    } else if (lower.startsWith("work_id:") || lower.startsWith("grouping:")) {
+                        command.params.push(parentCommand.params[i]);
                     }
                 }
             }
             // If we're not supplying artist_id then can't supply role_id
             if (artistIdRemoved && undefined!=roleIdPos) {
                 command.params.splice(roleIdPos, 1);
+            }
+            if (undefined!=item.grouping) {
+                command.params.push("grouping:"+item.grouping);
             }
         } else if (item.id.startsWith("genre_id:")) {
             for (var i=0, len=parentCommand.params.length; i<len; ++i) {
@@ -170,6 +188,16 @@ function buildStdItemCommand(item, parentCommand) {
                         command.params.push(parentCommand.params[i]);
                     }
                 }
+            }
+        } else if (item.id.startsWith("work_id:")) {
+            if (undefined!=item.composer_id) {
+                command.params.push("composer_id:"+item.composer_id);
+            }
+            if (undefined!=item.grouping) {
+                command.params.push("grouping:"+item.grouping);
+            }
+            if (undefined!=item.album_id) {
+                command.params.push("album_id:"+item.album_id);
             }
         }
     }

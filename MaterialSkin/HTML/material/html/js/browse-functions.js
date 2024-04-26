@@ -5,6 +5,17 @@
  * MIT license.
  */
 
+function browseCanSelect(item) {
+    return undefined!=item && (undefined!=item.stdItem || (item.menu && item.menu.length>0));
+}
+
+function browseAddLibId(view, params) {
+    let libId = view.currentLibId ? view.currentLibId : view.$store.state.library ? view.$store.state.library : LMS_DEFAULT_LIBRARY;
+    if (libId) {
+        params.push("library_id:"+libId);
+    }
+}
+
 function browseMatches(text, title) {
     if (title.startsWith(text)) {
         return true;
@@ -100,6 +111,7 @@ function browseAddHistory(view) {
     prev.headerSubTitle = view.headerSubTitle;
     prev.detailedSubInfo = view.detailedSubInfo;
     prev.detailedSubExtra = view.detailedSubExtra;
+    prev.extraInfo = view.extraInfo;
     prev.tbarActions = view.tbarActions;
     prev.pos = view.scrollElement.scrollTop;
     prev.grid = view.grid;
@@ -116,7 +128,7 @@ function browseAddHistory(view) {
     view.history.push(prev);
 }
 
-function browseActions(view, item, args, count, showCompositions) {
+function browseActions(view, item, args, count, showCompositions, showWorks) {
     var actions=[];
     if ((undefined==item || undefined==item.id || !item.id.startsWith(MUSIC_ID_PREFIX)) && // Exclude 'Compilations'
         (undefined==args['artist'] || (args['artist']!=i18n('Various Artists') && args['artist']!=LMS_VA_STRING && args['artist'].toLowerCase()!='various artists'))) {
@@ -159,7 +171,6 @@ function browseActions(view, item, args, count, showCompositions) {
                           weight:110});
         }
 
-
         if (undefined!=args['artist_id'] && undefined==args['album_id'] && undefined!=args['count'] && args['count']>1) {
             var params = [SORT_KEY+TRACK_SORT_PLACEHOLDER, PLAYLIST_TRACK_TAGS, 'artist_id:'+args['artist_id']];
             if (undefined!=args['role_id']) {
@@ -168,21 +179,27 @@ function browseActions(view, item, args, count, showCompositions) {
             if (undefined!=args['genre_id']) {
                 params.push(args['genre_id']);
             }
-            let libId = view.currentLibId ? view.currentLibId : view.$store.state.library ? view.$store.state.library : LMS_DEFAULT_LIBRARY;
-            if (libId) {
-                params.push("library_id:"+libId);
+            browseAddLibId(view, params);
+            actions.push({title:i18n('All songs'), icon:'music_note', do:{ command: ['tracks'], params: params}, weight:80, stdItem:STD_ITEM_ALL_TRACKS});
+        } else if (undefined!=args['work_id'] && undefined!=args['composer_id'] && undefined!=args['count'] && args['count']>1) {
+            var params = [SORT_KEY+TRACK_SORT_PLACEHOLDER, PLAYLIST_TRACK_TAGS, 'work_id:'+args['work_id'], 'composer_id:'+args['composer_id']];
+            if (undefined!=args['grouping']) {
+                params.push(args['grouping']);
             }
+            browseAddLibId(view, params);
             actions.push({title:i18n('All songs'), icon:'music_note', do:{ command: ['tracks'], params: params}, weight:80, stdItem:STD_ITEM_ALL_TRACKS});
         }
+
         if (undefined!=args['artist_id'] && showCompositions) {
             var params = [SORT_KEY+TRACK_SORT_PLACEHOLDER, PLAYLIST_TRACK_TAGS, 'artist_id:'+args['artist_id'], 'role_id:COMPOSER', 'material_skin_artist:'+args['artist']];
-            let libId = view.currentLibId ? view.currentLibId : view.$store.state.library ? view.$store.state.library : LMS_DEFAULT_LIBRARY;
-            if (libId) {
-                params.push("library_id:"+libId);
-            }
+            browseAddLibId(view, params);
             actions.push({title:i18n('Compositions'), svg:'composer', do:{ command: ['tracks'], params: params}, weight:81, stdItem:STD_ITEM_COMPOSITION_TRACKS});
         }
+        if (showWorks) {
+            actions.push({title:i18n('Works'), subtitle:args['artist'], svg:'classical-work', stdItem:STD_ITEM_CLASSICAL_WORKS, do:{ command: ['works'], params:[view.current.id]}, weight:82});
+        }
     }
+
     if (undefined!=item && undefined!=item.stdItem && undefined!=STD_ITEMS[item.stdItem].actionMenu) {
         var weight = 200;
         for (var i=0, loop=STD_ITEMS[item.stdItem].actionMenu, len=loop.length; i<len; ++i) {
@@ -199,15 +216,17 @@ function browseActions(view, item, args, count, showCompositions) {
                 weight++;
                 actions.push({action:loop[i], weight:ALBUM_SORTS_ACTION==loop[i] || TRACK_SORTS_ACTION==loop[i]
                                                 ? 2
-                                                : INSERT_ACTION==loop[i]
+                                                : SCROLL_TO_ACTION==loop[i]
                                                     ? 3
-                                                    : PLAY_SHUFFLE_ACTION==loop[i]
+                                                    : INSERT_ACTION==loop[i]
                                                         ? 4
-                                                        : ADD_RANDOM_ALBUM_ACTION==loop[i]
+                                                        : PLAY_SHUFFLE_ACTION==loop[i]
                                                             ? 5
-                                                            : MORE_LIB_ACTION==loop[i]
-                                                                ? 1000
-                                                                : weight});
+                                                            : ADD_RANDOM_ALBUM_ACTION==loop[i]
+                                                                ? 6
+                                                                : MORE_LIB_ACTION==loop[i]
+                                                                    ? 1000
+                                                                    : weight});
             }
         }
     }
@@ -353,40 +372,48 @@ function browseHandleListResponse(view, item, command, resp, prevPage, appendIte
         view.currentActions=[];
         let listingArtistAlbums = view.current.id.startsWith("artist_id:");
         let listingAlbumTracks = view.current.id.startsWith("album_id:");
+        let listingWorkAlbums = view.current.id.startsWith("work_id:");
         let listingAlbums = view.command.command[0]=="albums";
         let listingTracks = view.command.command[0]=="tracks";
         let title = view.current.title;
         let artist_id = listingArtistAlbums ? view.current.id.split(":")[1] : undefined;
-        let album_id = listingAlbumTracks ? view.current.id.split(":")[1] : undefined;
-        if (!listingArtistAlbums && listingAlbums) {
-            let pos = getField(command, "artist_id");
-            if (pos>=0) {
-                listingArtistAlbums = true;
-                let parts = title.split(":");
-                parts.shift();
-                title=parts.join(" ");
-                artist_id = command.params[pos].split(":")[1];
-            }
-        } else if (!listingAlbumTracks && listingTracks) {
-            let pos = getField(command, "album_id");
-            if (pos>=0) {
-                listingAlbumTracks = true;
-                let parts = title.split(":");
-                parts.shift();
-                title=parts.join(" ");
-                album_id = command.params[pos].split(":")[1];
-                pos = getField(command, "artist_id");
+        let album_id = listingAlbumTracks ? originalId(view.current.id).split(":")[1] : undefined;
+        let work_id = listingWorkAlbums ? view.current.id.split(":")[1] : undefined;
+        if (!view.current.id.startsWith(MUSIC_ID_PREFIX)) {
+            if (!listingArtistAlbums && listingAlbums) {
+                let pos = getField(command, "artist_id");
                 if (pos>=0) {
+                    listingArtistAlbums = true;
+                    let parts = title.split(":");
+                    parts.shift();
+                    title=parts.join(" ");
                     artist_id = command.params[pos].split(":")[1];
+                }
+            } else if (!listingAlbumTracks && listingTracks) {
+                let pos = getField(command, "album_id");
+                if (pos>=0) {
+                    listingAlbumTracks = true;
+                    let parts = title.split(":");
+                    parts.shift();
+                    title=parts.join(" ");
+                    album_id = originalId(command.params[pos]).split(":")[1];
+                    pos = getField(command, "artist_id");
+                    if (pos>=0) {
+                        artist_id = command.params[pos].split(":")[1];
+                    }
                 }
             }
         }
         var canAddAlbumSort=true;
-        if ((listingArtistAlbums && listingAlbums) || (listingAlbumTracks && listingTracks)) {
+        if (((listingArtistAlbums || listingWorkAlbums) && listingAlbums) || (listingAlbumTracks && listingTracks)) {
             var actParams = new Map();
+            var showWorksInMenu = false;
             actParams[view.current.id.split(':')[0]]=view.current.id.split(':')[1];
             if (undefined!=artist_id) {
                 actParams["artist_id"] = artist_id;
+            }
+            if (undefined!=work_id) {
+                actParams["work_id"] = work_id;
             }
             if (undefined!=album_id) {
                 actParams["album_id"] = album_id;
@@ -401,6 +428,18 @@ function browseHandleListResponse(view, item, command, resp, prevPage, appendIte
                 field = getField(view.command, "genre_id:");
                 if (field>=0) {
                     actParams['genre_id']=view.command.params[field];
+                }
+                showWorksInMenu = LMS_VERSION>=90000 && !lmsOptions.listWorks && getField(view.command, "work_id:")<0;
+            } else if (listingWorkAlbums) {
+                actParams['composer']=title;
+                actParams['count']=resp.items.length;
+                var field = getField(view.command, "composer_id:");
+                if (field>=0) {
+                    actParams['composer_id']=view.command.params[field];
+                }
+                field = getField(view.command, "grouping:");
+                if (field>=0) {
+                    actParams['grouping']=view.command.params[field];
                 }
             } else {
                 actParams['album']=title;
@@ -419,20 +458,35 @@ function browseHandleListResponse(view, item, command, resp, prevPage, appendIte
                     }
                 }
             }
-            view.currentActions = browseActions(view, resp.items.length>0 ? item : undefined, actParams, resp.items.length, resp.showCompositions);
+            view.currentActions = browseActions(view, resp.items.length>0 ? item : undefined, actParams, resp.items.length, resp.showCompositions, showWorksInMenu);
             if (listingArtistAlbums) {
                 for (var i=0, loop=view.onlineServices, len=loop.length; i<len; ++i) {
-                    var emblem = getEmblem(loop[i]+':');
+                    var emblem = getEmblem(loop[i].toLowerCase()+':');
                     view.currentActions.push({title:/*!i81n*/'wimp'==loop[i] ? 'Tidal' : capitalize(loop[i]),
                                               weight:110, svg:emblem ? emblem.name : undefined, id:loop[i], isService:true,
                                               artist_id:artist_id});
                 }
-            } else if (undefined!=LMS_P_RP && view.$store.state.showRating && view.items.length>1 && !queryParams.party && !LMS_KIOSK_MODE) {
+                if (showWorksInMenu) {
+                    lmsList('', ['works'], [view.current.id], 0, 1, false, view.nextReqId()).then(({data}) => {
+                        logJsonMessage("RESP", data);
+                        if (!data || !data.result || !data.result.works_loop || data.result.works_loop.length<1) {
+                            for (var i=0, loop=view.currentActions, len=loop.length; i<len; ++i) {
+                                if (loop[i].stdItem==STD_ITEM_CLASSICAL_WORKS) {
+                                    loop.splice(i, 1);
+                                    break;
+                                }
+                            }
+                        }
+                    }).catch(err => {
+                    });
+                }
+            } else if (!listingWorkAlbums && undefined!=LMS_P_RP && view.$store.state.showRating && view.items.length>1 && !queryParams.party && !LMS_KIOSK_MODE) {
                 view.currentActions.push({albumRating:true, title:i18n("Set rating for all tracks"), icon:"stars", weight:102});
             }
             if (LMS_P_MAI && undefined!=actParams['path'] && actParams['path'].length>0 && !queryParams.party && !LMS_KIOSK_MODE) {
                 // Check we have some local files, if not hide entry!
                 lmsCommand('', ['musicartistinfo', 'localfiles', 'folder:'+actParams['path']]).then(({data}) => {
+                    logJsonMessage("RESP", data);
                     if (!data || !data.result || !data.result.item_loop || data.result.item_loop.length<1) {
                         for (var i=0, loop=view.currentActions, len=loop.length; i<len; ++i) {
                             if (loop[i].localfiles) {
@@ -461,12 +515,14 @@ function browseHandleListResponse(view, item, command, resp, prevPage, appendIte
             let index = getField(command, "genre_id:");
             // Get genres for artist...
             let genreReqArtist=view.current.id;
-            lmsList('', ['genres'], [view.current.id].concat(index<0 ? [] : [command.params[index]]), 0, 25, false, view.nextReqId()).then(({data}) => {
-                if (data.result && data.result.genres_loop && view.isCurrentReq(data) && genreReqArtist==view.current.id) {
+            let params = [view.current.id].concat(index<0 ? [] : [command.params[index]]);
+            browseAddLibId(view, params);
+            lmsList('', ['genres'], params, 0, 25, false, view.nextReqId()).then(({data}) => {
+                if (data.result && data.result.genres_loop && genreReqArtist==view.current.id) {
                     let genreList = [];
                     let genreListPlain = [];
                     for (let g=0, loop=data.result.genres_loop, len=loop.length; g<len; ++g) {
-                        genreList.push("<obj class=\"link-item\" onclick=\"showGenre(event, "+loop[g].id+",\'"+escape(loop[g].genre)+"\', \'browse\')\">" + loop[g].genre + "</obj>");
+                        genreList.push(buildLink("show_genre", loop[g].id, loop[g].genre, "browse"));
                         if (IS_MOBILE) {
                             genreListPlain.push(loop[g].genre);
                         }
@@ -585,7 +641,11 @@ function browseHandleListResponse(view, item, command, resp, prevPage, appendIte
         }
 
         view.detailedSubInfo=resp.plainsubtitle ? resp.plainsubtitle : resp.years ? resp.years : "&nbsp;";
-        view.detailedSubExtra=resp.extraDetails ? [resp.extraDetails] : undefined;
+        view.detailedSubExtra = undefined;
+        view.extraInfo = resp.extra;
+        if (undefined!=resp.extra) {
+            view.detailedSubExtra=resp.extra['genres'] ? [resp.extra['genres'].join(SEPARATOR_HTML)] : resp.extra['genres.plain'] ? [resp.extra['genres.plain'].join(SEPARATOR_HTML)] : undefined;
+        }
         if ( (view.current && (view.current.stdItem==STD_ITEM_MAI || view.current.stdItem==STD_ITEM_MIX)) ||
              (1==view.items.length && ("text"==view.items[0].type || "html"==view.items[0].type)) ||
              (listingArtistAlbums && 0==view.items.length) /*Artist from online service*/ ) {
@@ -619,6 +679,11 @@ function browseHandleListResponse(view, item, command, resp, prevPage, appendIte
                 view.hoverBtns = false;
             }
         }
+
+        if (listingAlbums && lmsOptions.listWorks && LMS_VERSION>=90000 && view.items.length>0 && view.current.id.startsWith("artist_id:")) {
+            browseAddWorks(view);
+        }
+
         view.$nextTick(function () {
             view.setBgndCover();
             view.filterJumplist();
@@ -634,14 +699,76 @@ function browseHandleListResponse(view, item, command, resp, prevPage, appendIte
     }
 }
 
+function browseAddWorks(view) {
+    // Prevent flicker by not adding any albums, etc, until works list loaded
+    let id = view.current.id;
+    let orig = [];
+    orig.push.apply(orig, view.items);
+    view.items = [];
+    let params = [view.current.id];
+    browseAddLibId(view, params);
+    lmsList('', ['works'], params, 0, LMS_BATCH_SIZE, true, view.nextReqId()).then(({data}) => {
+        logJsonMessage("RESP", data);
+        if (id==view.current.id) {
+            var resp = parseBrowseResp(data, view.current, view.options);
+            if (resp.items.length>0) {
+                let existing = orig.length;
+                let sub = i18np("1 Work", "%1 Works", resp.items.length);
+                let key = '_WORKS_';
+                let icon = {svg:'release-work'};
+                let haveHeader = orig[0].header;
+                let items = [];
+                let jumplist = [];
+                items.push({title:i18n('Works')+" ("+resp.items.length+")", id:FILTER_PREFIX+key, header:true,
+                            isWorksCat: true, icon: icon.icon, svg: icon.svg,
+                            menu:[PLAY_ALL_ACTION, INSERT_ALL_ACTION, PLAY_SHUFFLE_ALL_ACTION, ADD_ALL_ACTION], count:resp.items.length});
+                for (let i=0, loop=resp.items, len=loop.length; i<len; ++i) {
+                    loop[i].filter = FILTER_PREFIX+key;
+                }
+
+                items.push.apply(items, resp.items);
+                jumplist.push({key:SECTION_JUMP, index:0, header:true, icon:icon});
+                view.listSize += resp.listSize+1;
+                for (let i=0, loop=resp.jumplist, len=loop.length; i<len; ++i) {
+                    loop[i].index+=1;
+                    jumplist.push(loop[i]);
+                }
+                if (!haveHeader) {
+                    key = orig[0].filter.substring(FILTER_PREFIX.length);
+                    if (isEmpty(key)) {
+                        key = 'ALBUM';
+                    }
+                    icon = releaseTypeIcon(key);
+                    jumplist.push({key:SECTION_JUMP, index:items.length, header:true, icon:icon});
+                    items.push({title:releaseTypeHeader(key)+" ("+existing+")", id:FILTER_PREFIX+key, header:true,
+                                icon: icon.icon, svg: icon.svg,
+                                menu:[PLAY_ALL_ACTION, INSERT_ALL_ACTION, PLAY_SHUFFLE_ALL_ACTION, ADD_ALL_ACTION], count:existing});
+                }
+                let offset = items.length;
+                for (let i=0, loop=view.jumplist, len=loop.length; i<len; ++i) {
+                    loop[i].index+=offset;
+                    jumplist.push(loop[i]);
+                }
+                items.push.apply(items, orig);
+                view.items = items;
+                view.jumplist = jumplist;
+                view.headerSubTitle = sub + SEPARATOR + view.headerSubTitle;
+            } else {
+                // No works, just use original list
+                view.items = orig;
+            }
+
+            view.$nextTick(function () {
+                view.filterJumplist();
+                view.layoutGrid(true);
+            });
+        }
+    }).catch(err => {
+    });
+}
+
 function browseHandleTextClickResponse(view, item, command, data, isMoreMenu) {
     var resp = parseBrowseResp(data, item, view.options);
-    var nextWindow = item.nextWindow
-                        ? item.nextWindow
-                        : item.actions && item.actions.go && item.actions.go.nextWindow
-                            ? item.actions.go.nextWindow
-                            : undefined;
-
     if (browseHandleNextWindow(view, item, command, resp, isMoreMenu)) {
         return;
     }
@@ -687,7 +814,7 @@ function browseClick(view, item, index, event) {
         }
         return;
     }
-    if (item.header) {
+    if (item.header && !item.slimbrowse) {
         if (item.allItems && item.allItems.length>0) { // Clicking on 'X Artists' / 'X Albums' / 'X Tracks' search header
             view.addHistory();
             view.items = item.allItems;
@@ -701,7 +828,7 @@ function browseClick(view, item, index, event) {
         } else if (view.selection.size>0) {
             view.select(item, index, event);
         } else {
-            view.itemMenu(item, index, event);
+            browseItemMenu(view, item, index, event);
         }
         return;
     }
@@ -712,7 +839,7 @@ function browseClick(view, item, index, event) {
         }
         let listRight = view.scrollElement.getBoundingClientRect().right;
         if (clickX>(listRight-64)) {
-            view.itemMenu(item, index, event);
+            browseItemMenu(view, item, index, event);
         } else {
             view.select(item, index, event);
         }
@@ -720,7 +847,7 @@ function browseClick(view, item, index, event) {
     }
     if (item.isPinned) {
         if (undefined!=item.url && "extra"!=item.type) { // Radio
-            view.itemMenu(item, index, event);
+            browseItemMenu(view, item, index, event);
             return;
         }
         if ("settingsPlayer"==item.type) {
@@ -740,7 +867,7 @@ function browseClick(view, item, index, event) {
         if (!view.clickTimer) {
             view.clickTimer = setTimeout(function () {
                 view.clickTimer = undefined;
-                view.itemMenu(item, index, event);
+                browseItemMenu(view, item, index, event);
             }.bind(view), LMS_DOUBLE_CLICK_TIMEOUT);
         } else {
             clearTimeout(view.clickTimer);
@@ -802,14 +929,14 @@ function browseClick(view, item, index, event) {
             window.open(item.weblink);
         }
     } else {
-        var command = view.buildCommand(item);
+        var command = browseBuildCommand(view, item);
         if (command.command.length>2 && command.command[1]=="playlist") {
             if (!item.menu || item.menu.length<1) { // No menu? Dynamic playlist? Just run command...
                 lmsCommand(view.playerId(), command.params ? command.command.concat(command.params) : command.command).then(({data}) => {
                     bus.$emit('showMessage', item.title);
                 });
             } else {
-                view.itemMenu(item, index, event);
+                browseItemMenu(view, item, index, event);
             }
             return;
         }
@@ -841,12 +968,13 @@ function browseAddCategories(view, item, isGenre) {
     if (undefined!=alt_id && (alt_id.includes("/") || alt_id[0]==item.id[0] || /*alt_id.startsWith("year:") ||*/ alt_id.startsWith("artist_id:") || alt_id.startsWith("album_id:") || alt_id.startsWith("track_id:"))) {
         alt_id = undefined;
     }
+
     let cat = { title: lmsOptions.separateArtistsList ? i18n("All Artists") : i18n("Artists"),
-                command: ["artists"],
-                params: [item.id, ARTIST_TAGS, 'include_online_only_artists:1'],
-                svg: "artist",
-                type: "group",
-                id: uniqueId(item.id, view.items.length)};
+            command: ["artists"],
+            params: [item.id, ARTIST_TAGS, 'include_online_only_artists:1'],
+            svg: "artist",
+            type: "group",
+            id: uniqueId(item.id, view.items.length)};
     if (undefined!=alt_id) { cat.params.push(alt_id); }
     view.items.push(cat);
     if (lmsOptions.separateArtistsList) {
@@ -872,13 +1000,13 @@ function browseAddCategories(view, item, isGenre) {
             command: ["albums"],
             params: [item.id, ALBUM_TAGS_PLACEHOLDER, "sort:random"],
             menu: [],
-            svg: "dice-album",
+            svg: lmsOptions.supportReleaseTypes ? "dice-release" : "dice-album",
             type: "group",
             id: uniqueId(item.id, view.items.length)};
     if (undefined!=alt_id) { cat.params.push(alt_id); }
     view.items.push(cat);
     /* 'years' does not accept genre filter, so this would show all years regardless
-     * of whether there was a track in that year of this genre in that year or not :(
+    * of whether there was a track in that year of this genre in that year or not :(
     if (isGenre && (undefined==command || "years"!=command)) {
         cat = { title: i18n("Years"),
                 command: ["years"],
@@ -892,16 +1020,17 @@ function browseAddCategories(view, item, isGenre) {
     */
     if (!isGenre && (undefined==command || "genres"!=command)) {
         cat = { title: i18n("Genres"),
-                 command: ["genres"],
-                 params: [item.id],
-                 svg: "guitar-acoustic",
-                 type: "group",
-                 id: uniqueId(item.id, view.items.length)};
+                command: ["genres"],
+                params: [item.id],
+                svg: "guitar-acoustic",
+                type: "group",
+                id: uniqueId(item.id, view.items.length)};
         if (undefined!=alt_id) { cat.params.push(alt_id); }
         view.items.push(cat);
     }
     view.inGenre = isGenre ? item.title : 'years';
-    if (isGenre ? useComposer(item.title) : lmsOptions.showComposer) {
+    let showcomposer=isGenre ? useComposer(item.title) : lmsOptions.showComposer;
+    if (showcomposer) {
         cat = { title: i18n("Composers"),
                 command: ["artists"],
                 params: ["role_id:COMPOSER", item.id, ARTIST_TAGS],
@@ -934,14 +1063,25 @@ function browseAddCategories(view, item, isGenre) {
         if (undefined!=alt_id) { cat.params.push(alt_id); }
         view.items.push(cat);
     }
+    if (showcomposer && LMS_VERSION>=90000) {
+        cat = { title: i18n("Works"),
+                command: ["works"],
+                params: [item.id],
+                svg: "classical-work",
+                type: "group",
+                id: uniqueId(item.id, view.items.length)};
+        if (undefined!=alt_id) { cat.params.push(alt_id); }
+        view.items.push(cat);
+    }
     cat = { title: i18n("All Songs"),
             command: ["tracks"],
-            params: [item.id, trackTags()+"elcy", SORT_KEY+TRACK_SORT_PLACEHOLDER],
+            params: [item.id, trackTags(true)+"ely", SORT_KEY+TRACK_SORT_PLACEHOLDER],
             icon: "music_note",
             type: "group",
             id: ALL_SONGS_ID};
     if (undefined!=alt_id) { cat.params.push(alt_id); }
     view.items.push(cat);
+
     view.headerTitle = stripLinkTags(item.title);
     view.headerSubTitle = i18n("Select category");
     browseSetScroll(view);
@@ -1083,7 +1223,7 @@ function browseItemAction(view, act, item, index, event) {
         var favUrl = item.favUrl ? item.favUrl : item.url;
         var favIcon = item.favIcon;
         var favType = SECTION_PODCASTS==item.section ? "link" : "audio";
-        var favTitle = item.origTitle ? item.origTitle : item.title;
+        var favTitle = item.favTitle ? item.favTitle : item.origTitle ? item.origTitle : item.title;
 
         if (item.presetParams && item.presetParams.favorites_url) {
             favUrl = item.presetParams.favorites_url;
@@ -1181,7 +1321,7 @@ function browseItemAction(view, act, item, index, event) {
             var resp = parseBrowseResp(data, view.current, view.options);
             if (resp.items.length>0 && resp.items[0].id) {
                 var item = resp.items[0];
-                var command = ["playlistcontrol", "cmd:add", item.id];
+                var command = ["playlistcontrol", "cmd:add", originalId(item.id)];
                 var genrePos = LMS_NO_GENRE_FILTER ? -1 : getField({params:params}, "genre_id:");
                 if (genrePos>=0) {
                     command.push(params[genrePos]);
@@ -1201,6 +1341,9 @@ function browseItemAction(view, act, item, index, event) {
         });
     } else if (SELECT_ACTION===act) {
         if (!view.selection.has(index)) {
+            if (!browseCanSelect(view.items[index])) {
+                return;
+            }
             if (0==view.selection.size) {
                 bus.$emit('browseSelection', true);
             }
@@ -1275,7 +1418,7 @@ function browseItemAction(view, act, item, index, event) {
         } else { // Need to filter items...
             var itemList = [];
             var isFilter = item.id.startsWith(FILTER_PREFIX) || PLAY_DISC_ACTION==act; // MultiCD's have a 'filter' so we can play a single CD
-            var check = isFilter ? (PLAY_DISC_ACTION==act ? item.filter : item.id) : (SEARCH_ID==item.id && view.items[0].id.startsWith("track") ? "track_id" : "album_id");
+            var check = isFilter ? (PLAY_DISC_ACTION==act ? item.filter : originalId(item.id)) : (SEARCH_ID==item.id && view.items[0].id.startsWith("track") ? "track_id" : "album_id");
             var list = item.allItems && item.allItems.length>0 ? item.allItems : view.items;
             var itemIndex = undefined;
             for (var i=0, len=list.length; i<len; ++i) {
@@ -1299,7 +1442,7 @@ function browseItemAction(view, act, item, index, event) {
     } else if (act==GOTO_ARTIST_ACTION) {
         view.fetchItems(view.replaceCommandTerms({command:["albums"], params:["artist_id:"+item.artist_id, ARTIST_ALBUM_TAGS, SORT_KEY+ARTIST_ALBUM_SORT_PLACEHOLDER]}), {cancache:false, id:"artist_id:"+item.artist_id, title:item.id.startsWith("album_id:") ? item.subtitle : item.artist, stdItem:STD_ITEM_ARTIST});
     } else if (act==GOTO_ALBUM_ACTION) {
-        view.fetchItems({command:["tracks"], params:["album_id:"+item.album_id, trackTags(), SORT_KEY+"tracknum"]}, {cancache:false, id:"album_id:"+item.album_id, title:item.album, stdItem:STD_ITEM_ALBUM});
+        view.fetchItems({command:["tracks"], params:["album_id:"+item.album_id, trackTags(true), SORT_KEY+"tracknum"]}, {cancache:false, id:"album_id:"+item.album_id, title:item.album, stdItem:STD_ITEM_ALBUM});
     } else if (ADD_TO_PLAYLIST_ACTION==act) {
         bus.$emit('dlg.open', 'addtoplaylist', [item], [browseBuildCommand(view, item)]);
     } else if (REMOVE_DUPES_ACTION==act) {
@@ -1324,7 +1467,7 @@ function browseItemAction(view, act, item, index, event) {
             sortPlaylist(view, undefined, ACTIONS[act].title, ["material-skin", "sort-playlist", item.id]);
         }
     } else if (BR_COPY_ACTION==act) {
-        bus.$emit('queueGetSelectedUrls', index, item.id);
+        bus.$emit('queueGetSelectedUrls', index, originalId(item.id));
     } else if (DOWNLOAD_ACTION==act) {
         // See if we can get album-artist from current view / history
         let aa = view.current.id.startsWith("artist_id:") ? view.current.title : undefined;
@@ -1357,14 +1500,17 @@ function browseItemAction(view, act, item, index, event) {
         download(item, item.id.startsWith("album_id:") ? view.buildCommand(item) : undefined, aa);
     } else if (SHOW_IMAGE_ACTION==act) {
         bus.$emit('dlg.open', 'gallery', [item.image], 0, true);
-    } else if (SCROLL_TO_DISC_ACTION==act) {
-        var discs = [];
+    } else if (SCROLL_TO_ACTION==act) {
+        var choices = [];
         for (var i=0, loop=view.items, len=loop.length; i<len; ++i) {
             if (loop[i].header) {
-                discs.push(loop[i]);
+                if (undefined==loop[i].jump) {
+                    loop[i].jump = i;
+                }
+                choices.push(loop[i]);
             }
         }
-        choose(ACTIONS[act].title, discs).then(choice => {
+        choose(ACTIONS[act].title, choices).then(choice => {
             if (undefined!=choice) {
                 view.jumpTo(choice.jump);
             }
@@ -1610,24 +1756,19 @@ function browseGoBack(view, refresh) {
             return; // Search results not being shown, so '<-' button just closes search field
         }
     }
-    if (view.prevPage && !view.$store.state.desktopLayout) {
+    if (view.prevPage) {
         var nextPage = ""+view.prevPage;
-        //if (NP_INFO==nextPage || NP_EXPANDED==nextPage) {
-        //    view.$nextTick(function () {
-        //        view.$nextTick(function () {
-        //            //if (!view.$store.state.desktopLayout) {
-        //                view.$store.commit('setPage', 'now-playing');
-        //            //}
-        //            if (NP_INFO==nextPage) {
-        //                bus.$emit('info');
-        //            } else {
-        //                bus.$emit('expandNowPlaying', true);
-        //            }
-        //        });
-        //    });
-        //} else { // if (!view.$store.state.desktopLayout) {
+        if (view.$store.state.desktopLayout) {
+            if (NP_INFO==nextPage || NP_EXPANDED==nextPage) {
+                if (NP_INFO==nextPage) {
+                    bus.$emit('info');
+                } else {
+                    bus.$emit('expandNowPlaying', true);
+                }
+            }
+        } else {
             view.$nextTick(function () { view.$nextTick(function () { view.$store.commit('setPage', NP_INFO==nextPage || NP_EXPANDED==nextPage ? 'now-playing' : nextPage); }); });
-        //}
+        }
     }
     let next = undefined==view.current ? undefined : {id:view.current.id, pos:view.scrollElement.scrollTop};
     if (view.history.length<2) {
@@ -1656,6 +1797,7 @@ function browseGoBack(view, refresh) {
     view.headerSubTitle = prev.headerSubTitle;
     view.detailedSubInfo = prev.detailedSubInfo;
     view.detailedSubExtra = prev.detailedSubExtra;
+    view.extraInfo = prev.extraInfo;
     view.tbarActions = prev.tbarActions;
     view.command = prev.command;
     view.subtitleClickable = prev.subtitleClickable;
@@ -1739,7 +1881,7 @@ function browseBuildCommand(view, item, commandName, doReplacements) {
                 }
             }
             // Check params used to initially build current list, and add any missing onlineServices
-            // Releated to LMS issue https://github.com/Logitech/slimserver/issues/806
+            // Releated to LMS issue https://github.com/LMS-Community/slimserver/issues/806
             if (undefined!=baseActions && undefined!=baseActions.parentParams) {
                 for (let i=0, loop=baseActions.parentParams, len=loop.length; i<len; ++i) {
                     let key = loop[i].split(":")[0];
@@ -1769,13 +1911,11 @@ function browseBuildCommand(view, item, commandName, doReplacements) {
                     mode = params[i].split(":")[1];
                     if (mode.startsWith("myMusicArtists")) {
                         mode="artists";
-                    } else if (mode.startsWith("myMusicAlbums") || mode=="randomalbums") {
-                        mode="albums";
-                    } else if (mode=="vaalbums") {
+                    } else if (mode.startsWith("myMusicAlbums") || mode=="randomalbums" || mode=="vaalbums") {
                         mode="albums";
                     } else if (mode=="years") {
                         p.push("hasAlbums:1");
-                    } else if (mode!="artists" && mode!="albums" && mode!="genres" && mode!="tracks" && mode!="playlists") {
+                    } else if (mode!="artists" && mode!="albums" && mode!="genres" && mode!="tracks" && mode!="playlists" && mode!="works") {
                         canReplace = false;
                         break;
                     }
@@ -1808,7 +1948,9 @@ function browseBuildCommand(view, item, commandName, doReplacements) {
             if (canReplace && c.length==1 && mode) {
                 if (mode=="tracks") {
                     if (!hasTags) {
-                        p.push(trackTags());
+                        // If view.current.id starts with "track_id:" then we are in a 'More' menu, therefore
+                        // want cover id of tracks...
+                        p.push(trackTags(undefined!=view.current && view.current.id.startsWith("track_id:")));
                     }
                     if (!hasSort) {
                         p.push(SORT_KEY+"tracknum");
@@ -1864,7 +2006,6 @@ function browseBuildCommand(view, item, commandName, doReplacements) {
     if (undefined==doReplacements || doReplacements) {
         cmd=view.replaceCommandTerms(cmd, item);
     }
-
     return cmd;
 }
 
@@ -1879,6 +2020,7 @@ function browseMyMusicMenu(view) {
             logJsonMessage("RESP", data);
             view.myMusic = [];
             var stdItems = new Set();
+            var listWorks = false;
             // Get basic, configurable, browse modes...
             if (data && data.result && data.result.modes_loop) {
                 for (var idx=0, loop=data.result.modes_loop, loopLen=loop.length; idx<loopLen; ++idx) {
@@ -1911,10 +2053,18 @@ function browseMyMusicMenu(view) {
                         item.icon = "local_library";
                         item.cancache = true;
                     } else if (c.id.startsWith("myMusicAlbums")) {
-                        item.icon = "album";
                         item.cancache = true;
-                        if (lmsOptions.supportReleaseTypes && c.id=="myMusicAlbums") {
-                            item.title = i18n("Releases");
+                        if (c.id=="myMusicAlbums") {
+                            item.icon = "album";
+                            if (lmsOptions.supportReleaseTypes) {
+                                item.title = i18n("Releases");
+                                item.icon = undefined;
+                                item.svg = "release"
+                            }
+                        } else {
+                            let icon = releaseTypeIcon(getParamVal(command, "release_type", "ALBUM"));
+                            item.icon = icon.icon;
+                            item.svg = icon.svg;
                         }
                     } else if (c.id.startsWith("myMusicGenres")) {
                         item.svg = "guitar-acoustic";
@@ -1936,7 +2086,7 @@ function browseMyMusicMenu(view) {
                     } else if (c.id.startsWith("myMusicFileSystem")) {
                         item.icon = "computer";
                     } else if (c.id == "myMusicRandomAlbums") {
-                        item.svg = "dice-album";
+                        item.svg = lmsOptions.supportReleaseTypes ? "dice-release" : "dice-album";
                         item.icon = undefined;
                         if (lmsOptions.supportReleaseTypes) {
                             item.title = i18n("Random Releases");
@@ -1947,6 +2097,10 @@ function browseMyMusicMenu(view) {
                     } else if (c.id.startsWith("myMusicFlopTracks")) {
                         item.icon = "arrow_downward";
                         item.limit = 200;
+                    } else if (c.id.startsWith("myMusicWorks")) {
+                        item.svg = "classical-work";
+                        item.icon = undefined;
+                        listWorks = true;
                     } else if (c.icon) {
                         if (c.icon.endsWith("/albums.png")) {
                             item.icon = "album";
@@ -1973,6 +2127,10 @@ function browseMyMusicMenu(view) {
                     view.myMusic.push(item);
                 }
             }
+            if (listWorks!=lmsOptions.listWorks) {
+                lmsOptions.listWorks = listWorks;
+                setLocalStorageVal('listWorks', listWorks);
+            }
             // Now get standard menu, for extra (e.g. CustomBrowse) entries...
             if (!view.playerId()) { // No player, then can't get playre specific items just yet
                 view.processMyMusicMenu();
@@ -1982,7 +2140,6 @@ function browseMyMusicMenu(view) {
             } else {
                 lmsList(view.playerId(), ["menu", "items"], ["direct:1"]).then(({data}) => {
                     if (data && data.result && data.result.item_loop) {
-                        logJsonMessage("RESP", data);
                         for (var idx=0, loop=data.result.item_loop, loopLen=loop.length; idx<loopLen; ++idx) {
                             var c = loop[idx];
                             if (c.node=="myMusic" && c.id) {
@@ -2120,7 +2277,7 @@ function browsePin(view, item, add, mapped) {
             var field = getField(item, "genre_id:");
             if (field>=0) {
                 lmsCommand("", ["material-skin", "map", item.params[field]]).then(({data}) => {
-                   if (data.result.genre) {
+                    if (data.result.genre) {
                         item.params[field]="genre:"+data.result.genre;
                         browsePin(view, item, add, true);
                     }
@@ -2228,6 +2385,13 @@ function browseReplaceCommandTerms(view, cmd, item) {
             } else if (cmd.params[i].startsWith(SORT_KEY+ALBUM_SORT_PLACEHOLDER) ||
                        cmd.params[i].startsWith(SORT_KEY+ARTIST_ALBUM_SORT_PLACEHOLDER)) {
                 var sort=getAlbumSort(cmd, view.inGenre);
+                // Remove "sort:album" from "playlistcontrol" - LMS fails on this.
+                if (LMS_VERSION<80500 && 'album'==sort.by && 'playlistcontrol'==cmd.command[0]) {
+                    cmd.params.splice(i, 1);
+                    len-=1;
+                    --i;
+                    continue;
+                }
                 cmd.params[i]=cmd.params[i].replace(SORT_KEY+ALBUM_SORT_PLACEHOLDER, SORT_KEY+sort.by)
                                            .replace(SORT_KEY+ARTIST_ALBUM_SORT_PLACEHOLDER, SORT_KEY+sort.by);
                 if (sort.rev) {
@@ -2266,12 +2430,12 @@ function browseBuildFullCommand(view, item, act) {
         if (item.url && (!item.id || (!item.id.startsWith("playlist_id:") && !item.id.startsWith("track_id")))) {
             command.command = ["playlist", INSERT_ACTION==act ? "insert" : ACTIONS[act].cmd, item.url, item.title];
         } else if (item.app && item.id) {
-            command.command = [item.app, "playlist", INSERT_ACTION==act ? "insert" :ACTIONS[act].cmd, item.id];
+            command.command = [item.app, "playlist", INSERT_ACTION==act ? "insert" :ACTIONS[act].cmd, originalId(item.id)];
         } else if (item.isFolderItem || item.isUrl) {
-            command.command = ["playlist", INSERT_ACTION==act ? "insert" : ACTIONS[act].cmd, item.id];
+            command.command = ["playlist", INSERT_ACTION==act ? "insert" : ACTIONS[act].cmd, originalId(item.id)];
         } else if (item.id) {
             command.command = ["playlistcontrol", "cmd:"+(act==PLAY_ACTION ? "load" : INSERT_ACTION==act ? "insert" :ACTIONS[act].cmd)];
-            if (item.id.startsWith("album_id:")  || item.id.startsWith("artist_id:")) {
+            if (item.id.startsWith("album_id:") || item.id.startsWith("artist_id:") || item.id.startsWith("work_id:")) {
                 var params = undefined!=item.stdItem || undefined!=item.altStdItem ? buildStdItemCommand(item, item.id==view.current.id ? view.history.length>0 ? view.history[view.history.length-1].command : undefined : view.command).params : item.params;
                 for (var i=0, loop = params, len=loop.length; i<len; ++i) {
                     if ( (!LMS_NO_ROLE_FILTER && (loop[i].startsWith("role_id:"))) ||
@@ -2283,26 +2447,30 @@ function browseBuildFullCommand(view, item, act) {
                         if (loop[i].startsWith("artist_id:") && !item.id.startsWith("album_id:")) {
                             command.params.push(SORT_KEY+ARTIST_ALBUM_SORT_PLACEHOLDER);
                         }
+                    } else if ((loop[i].startsWith("composer_id:") || loop[i].startsWith("work_id:") || loop[i].startsWith("grouping:") || loop[i].startsWith("album_id:")) &&
+                                getIndex(command.params, loop[i].split(':')[0]+":")<0) {
+                        command.params.push(loop[i]);
                     }
                 }
             } else if (item.id.startsWith("genre_id:")) {
                 command.params.push(SORT_KEY+ALBUM_SORT_PLACEHOLDER);
             }
 
-            command.command.push(originalId(item.id));
+            let id = originalId(item.id);
+            if (getIndex(command.params, id.split(':')[0]+":")<0) {
+                command.command.push(id);
+            }
         }
         command=browseReplaceCommandTerms(view, command);
     }
 
-    if (command.command.length===0) {
+    if (command.command.length==0) {
         return command;
     }
 
     // Add params onto command...
     if (command.params.length>0) {
-        command.params.forEach(i => {
-            command.command.push(i);
-        });
+        command.command = command.command.concat(command.params);
     }
     return command;
 }
@@ -2529,14 +2697,55 @@ function browseAddExtra(view, html) {
     }
 }
 
+function browseBuildInfoHtml(view) {
+    if (undefined!=view.extraInfo) {
+        let html = "";
+        let firstEntry = true;
+        let infoTypes = [];
+        infoTypes.push.apply(infoTypes, ARTIST_TYPES);
+        infoTypes.push("years");
+        infoTypes.push("genres");
+        for (let i=0, len=infoTypes.length; i<len; ++i) {
+            let type = infoTypes[i];
+            if (undefined!=view.extraInfo[type]) {
+                if (firstEntry) {
+                    firstEntry = false;
+                    html+="<p><b>" + i18n("Details") + "</b><br/><table class=\"np-html-sect\">";
+                }
+                let key = "genres"==type
+                            ? i18n("Genre")
+                            : "years"==type
+                            ? i18n("Year")
+                            : "albumartist"==type
+                            ? i18n("Album artist")
+                            : "trackartist"==type
+                            ? undefined==view.extraInfo["artist"] ? i18n("Artist") : i18n("Track artist")
+                            : "composer"==type
+                            ? i18n("Composer")
+                            : "conductor"==type
+                            ? i18n("Conductor")
+                            : "band"==type
+                            ? i18n("Band/orchestra")
+                            : i18n("Artist");
+                html+="<tr><td>"+key+":&nbsp;</td><td>"+view.extraInfo[type].join(SEPARATOR_HTML)+"</td></tr>";
+            }
+        }
+        if (!firstEntry) {
+            html+="</table>"
+        }
+        return html;
+    }
+    return undefined;
+}
+
 function browseFetchExtra(view, fetchArtists) {
     let item = view.current;
-    let sub = view.detailedSubExtra[view.detailedSubExtra.length-1];
+    let infoHtml = browseBuildInfoHtml(view);
+
     view.extra = undefined;
     if (!fetchArtists) {
-        if (sub!=undefined) {
-            let html = "<p><b>" + i18n("Genres") + "</b><br/><br/>" + sub;
-            view.extra = { html:html, id: item.id };
+        if (infoHtml!=undefined) {
+            view.extra = { html:infoHtml, id: item.id };
         }
         return;
     }
@@ -2553,9 +2762,9 @@ function browseFetchExtra(view, fetchArtists) {
             }
         }
 
-        if (sub!=undefined) {
+        if (undefined!=sub) {
             html = undefined==html ? "" : (html+"<br/>");
-            html += "<p><b>" + i18n("Genres") + "</b><br/><br/>" + sub;
+            html += infoHtml;
         }
         if (undefined!=html) {
             if (undefined==view.fetchingItem) { // Have response already so can append
@@ -2565,12 +2774,11 @@ function browseFetchExtra(view, fetchArtists) {
             }
         }
     }).catch(err => {
-        if (sub!=undefined) {
-            let html = "<p><b>" + i18n("Genres") + "</b><br/><br/>" + sub;
+        if (undefined!=infoHtml) {
             if (undefined==view.fetchingItem) { // Have response alreadty so can append
-                browseAddExtra(view, html);
+                browseAddExtra(view, infoHtml);
             } else {
-                view.extra = { html:html, id: item.id };
+                view.extra = { html:infoHtml, id: item.id };
             }
         }
     });

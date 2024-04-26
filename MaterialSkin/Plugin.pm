@@ -78,7 +78,7 @@ my @ADV_SEARCH_OTHER = ('content_type', 'contributor_namesearch.active1', 'contr
 
 my %IGNORE_PROTOCOLS = map { $_ => 1 } ('mms', 'file', 'tmp', 'http', 'https', 'spdr', 'icy', 'teststream', 'db', 'playlist');
 
-my @BOOL_OPTS = ('allowDownload', 'playShuffle', 'touchLinks', 'showAllArtists', 'artistFirst', 'yearInSub', 'showComment', 'genreImages', 'showComposer', 'showConductor', 'showBand');
+my @BOOL_OPTS = ('allowDownload', 'playShuffle', 'touchLinks', 'showAllArtists', 'artistFirst', 'yearInSub', 'showComment', 'genreImages', 'maiComposer', 'showComposer', 'showConductor', 'showBand');
 
 sub initPlugin {
     my $class = shift;
@@ -114,6 +114,7 @@ sub initPlugin {
         composergenres => $DEFAULT_COMPOSER_GENRES,
         conductorgenres => $DEFAULT_CONDUCTOR_GENRES,
         bandgenres => $DEFAULT_BAND_GENRES,
+        maiComposer => 0,
         showComposer => 1,
         showConductor => 0,
         showBand => 0,
@@ -227,7 +228,7 @@ sub lmsVersion {
 sub windowTitle {
     my $title = $prefs->get('windowTitle');
     if (!$title || $title eq '') {
-        return 'Logitech Media Server';
+        return 'Lyrion Music Server';
     }
     return $title;
 }
@@ -433,6 +434,7 @@ sub _cliCommand {
         $request->addResult('composergenres', $prefs->get('composergenres'));
         $request->addResult('conductorgenres', $prefs->get('conductorgenres'));
         $request->addResult('bandgenres', $prefs->get('bandgenres'));
+        $request->addResult('maiComposer', $prefs->get('maiComposer'));
         $request->addResult('showComposer', $prefs->get('showComposer'));
         $request->addResult('showConductor', $prefs->get('showConductor'));
         $request->addResult('showBand', $prefs->get('showBand'));
@@ -1626,8 +1628,41 @@ sub _svgHandler {
     my $dir = dirname(__FILE__);
     my $svgName = basename($request->uri->path);
     my $filePath = $dir . "/HTML/material/html/images/" . $svgName . ".svg";
+    my $altFilePath = Slim::Utils::Prefs::dir() . "/material-skin/images/" . $svgName . ".svg";
     my $colour = "#f00";
     my $colour2 = "#";
+
+    # If this is for a release type then fallback to release.svg if it does not exist
+    if (rindex($svgName, "release-")==0 && (! -e $filePath) && (! -e $altFilePath)) {
+        my $end = substr($svgName, -1);
+        if ($end eq "s") {
+            $svgName = substr($svgName, 0, -1);
+            $filePath = $dir . "/HTML/material/html/images/" . $svgName . ".svg";
+            $altFilePath = Slim::Utils::Prefs::dir() . "/material-skin/images/" . $svgName . ".svg";
+        }
+        if ((! -e $filePath) && (! -e $altFilePath)) {
+            if (rindex($svgName, "release-live")==0) {
+                $filePath = $dir . "/HTML/material/html/images/release-live.svg";
+            } elsif (rindex($svgName, "release-remix")==0) {
+                $filePath = $dir . "/HTML/material/html/images/release-remix.svg";
+            } elsif (rindex($svgName, "composer")>0) {
+                $filePath = $dir . "/HTML/material/html/images/release-composer.svg";
+            } elsif (rindex($svgName, "conductor")>0) {
+                $filePath = $dir . "/HTML/material/html/images/release-conductor.svg";
+            } elsif ((rindex($svgName, "orchestra")>0) || (rindex($svgName, "appearanceband")>0)) {
+                $filePath = $dir . "/HTML/material/html/images/release-orchestra.svg";
+            } elsif (rindex($svgName, "appearance")>0) {
+                $filePath = $dir . "/HTML/material/html/images/release-appearance.svg";
+            }
+        }
+        if ((! -e $filePath) && (! -e $altFilePath)) {
+            $filePath = $dir . "/HTML/material/html/images/release.svg";
+        }
+    }
+    # If desired path does not exist check alt location
+    if (! -e $filePath) {
+        $filePath = $altFilePath;
+    }
 
     if ($request->uri->can('query_param')) {
         $colour = "#" . $request->uri->query_param('c');
@@ -1656,10 +1691,6 @@ sub _svgHandler {
                 $colour2 = "#" . substr($uri, $start);
             }
         }
-    }
-
-    if (! -e $filePath) {
-        $filePath = Slim::Utils::Prefs::dir() . "/material-skin/images/" . $svgName . ".svg";
     }
 
     # Check for plugin icon...

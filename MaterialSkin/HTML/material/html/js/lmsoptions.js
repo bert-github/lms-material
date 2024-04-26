@@ -10,6 +10,7 @@ var lmsOptions = {techInfo: getLocalStorageBool('techInfo', false),
                   conductorGenres: new Set(),
                   composerGenres: new Set(),
                   bandGenres: new Set(),
+                  maiComposer: getLocalStorageBool('maiComposer', false),
                   showConductor: getLocalStorageBool('showConductor', false),
                   showComposer: getLocalStorageBool('showComposer', true),
                   showBand: getLocalStorageBool('showBand', true),
@@ -32,5 +33,7 @@ var lmsOptions = {techInfo: getLocalStorageBool('techInfo', false),
                   genreImages: getLocalStorageBool('genreImages', false),
                   touchLinks: getLocalStorageBool('touchLinks', false),
                   yearInSub: getLocalStorageBool('yearInSub', true),
-                  playShuffle: getLocalStorageBool('playShuffle', false)
+                  playShuffle: getLocalStorageBool('playShuffle', false),
+                  time12hr: LMS_DEF_12HR,
+                  listWorks: getLocalStorageBool('listWorks', false)
                 };

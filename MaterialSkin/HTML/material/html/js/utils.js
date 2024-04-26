@@ -49,7 +49,7 @@ function parseQueryParams() {
     var resp = { actions:[], debug:new Set(), hide:new Set(), dontEmbed:new Set(), layout:undefined, player:undefined, single:false,
         css:undefined, download:'browser', addpad:false, party:false, expand:[], npRatio:1.33333333,
         nativeStatus:0, nativeColors:0, nativePlayer:0, nativeUiChanges:0, nativeTheme:0, nativeCover:0, nativePlayerPower:0, nativeAccent:0,
-        nativeTitlebar:0, appSettings:undefined, appQuit:undefined, appLaunchPlayer:undefined, altBtnLayout:IS_WINDOWS};
+        nativeTitlebar:0, appSettings:undefined, appQuit:undefined, appLaunchPlayer:undefined, altBtnLayout:IS_WINDOWS, dontTrapBack:false};
 
     for (var i = query.length - 1; i >= 0; i--) {
         var kv = query[i].split('=');
@@ -94,8 +94,8 @@ function parseQueryParams() {
             if (parts.length>1) {
                 setLocalStorageVal('color', parts[1]);
             }
-        } else if ("single"==kv[0] || "addpad"==kv[0] || "party"==kv[0]) {
-            resp[kv[0]]=true;
+        } else if ("single"==kv[0] || "addpad"==kv[0] || "party"==kv[0] || "altBtnLayout"==kv[0] || "dontTrapBack"==kv[0]) {
+            resp[kv[0]]=kv.length<2 || "true"==kv[1] || "1"==kv[1];
         } else if ("download"==kv[0] && kv.length>1) {
             resp.download=kv[1];
         } else if ("dontEmbed"==kv[0]) {
@@ -103,8 +103,6 @@ function parseQueryParams() {
             for (var j=0, len=parts.length; j<len; ++j) {
                 resp.dontEmbed.add(parts[j]);
             }
-        } else if ("altBtnLayout"==kv[0]) {
-            resp.altBtnLayout=kv.length<1 || "true"==kv[1];
         } else if ("expand"==kv[0] && kv.length>1) {
             resp.expand=decodeURIComponent(kv[1]).split("/");
         } else if ("npRatio"==kv[0]) {
@@ -254,6 +252,12 @@ function resolveImageUrl(image, size) {
     }
     if (image=="html/images/radio.png") {
         return DEFAULT_RADIO_COVER;
+    }
+    if (image=="html/images/works.png") {
+        return DEFAULT_WORKS_COVER;
+    }
+    if (image=="plugins/RandomPlay/html/images/icon.png") {
+        return RANDOMPLAY_COVER;
     }
     var idx = image.lastIndexOf(".png");
     if (idx < 0) {
@@ -639,7 +643,7 @@ function hasPlayableId(item) {
            item.album || item.artist || item.variousartist || item.year || item.genre || item.playlist; // CustomBrowse
 }
 
-const ADD_LIBRARY_ID = new Set(['artists', 'albums', 'tracks', 'genres', 'years', 'browselibrary', 'custombrowse']);
+const ADD_LIBRARY_ID = new Set(['artists', 'albums', 'tracks', 'genres', 'years', 'browselibrary', 'custombrowse', 'works']);
 
 function shouldAddLibraryId(command) {
     if (command.command && command.command.length>0) {
@@ -647,10 +651,15 @@ function shouldAddLibraryId(command) {
             return true;
         }
         if (command.command[0]=="playlistcontrol") {
-            for (var i=1, len=command.command.length; i<len; ++i) {
-                if (command.command[i].startsWith("artist_id:") || command.command[i].startsWith("album_id:") || command.command[i].startsWith("track_id:") ||
-                    command.command[i].startsWith("genre_id:") || command.command[i].startsWith("year:") || command.command[i].startsWith("playlist_id:")) {
-                    return true;
+            var lists =["command", "params"];
+            for (var l=0, llen=lists.length; l<llen; ++l) {
+                var list=command[lists[l]];
+                for (var i=0, len=list.length; i<len; ++i) {
+                    if (list[i].startsWith("artist_id:") || list[i].startsWith("album_id:") || list[i].startsWith("track_id:") ||
+                        list[i].startsWith("genre_id:") || list[i].startsWith("year:") || list[i].startsWith("playlist_id:") ||
+                        list[i].startsWith("work_id:")) {
+                        return true;
+                    }
                 }
             }
         }
@@ -664,11 +673,11 @@ function addPart(str, part) {
 
 function commandGridKey(command, item) {
     return command.command[0]+
-           (undefined==item || undefined==item.type || undefined!=item.stdItem ? "" : ("-"+item.type))+
+           (undefined==item || undefined==item.type || undefined!=item.stdItem || item.id.startsWith(MUSIC_ID_PREFIX) ? "" : ("-"+item.type))+
            "-grid";
 }
 
-const USE_LIST_VIEW_BY_DEFAULT=new Set(["other-grid", "favorites-grid", "podcasts-grid", "youtube-grid", "playhistory-grid", "spotty-grid", "qobuz-grid", "tidal-grid", "wimp-grid"]);
+const USE_LIST_VIEW_BY_DEFAULT=new Set(["other-grid", "favorites-grid", "podcasts-grid", "youtube-grid", "playhistory-grid", "spotty-grid", "qobuz-grid", "tidal-grid", "wimp-grid", "works-grid"]);
 
 function isSetToUseGrid(command, item) {
     var key = commandGridKey(command, item);
@@ -761,6 +770,11 @@ function getField(item, field) {
     return getIndex(item.params, field);
 }
 
+function getParamVal(item, field, defVal) {
+    let idx = getIndex(item.params, field);
+    return -1==idx ? defVal : item.params[idx].split(':')[1]
+}
+
 function setFontSize(sz) {
     let std = 16;
     let small = 14;
@@ -831,7 +845,7 @@ function shortcutStr(key, shift, alt) {
         }
     }
     if (alt) {
-        return IS_APPLE ? i18n("Option+%1", key) : i18n("Alt+%1", key);
+        return IS_APPLE ? ("⌥+"+key) : i18n("Alt+%1", key);
     }
     if (shift) {
         return IS_APPLE ? i18n("⌘+Shift+%1", key) : i18n("Ctrl+Shift+%1", key);
@@ -954,8 +968,8 @@ function splitIntArray(val) {
     return undefined==val || Array.isArray(val) ? val : (""+val).split(",").map(function(itm) { return itm.trim() }).map(Number);
 }
 
-function splitStringArray(val, isGenre) {
-    return undefined==val || Array.isArray(val) ? val : (""+val).split(isGenre ? "," : MULTI_SPLIT_REGEX).map(function(itm) { return itm.trim() });
+function splitStringArray(val, plainSep) {
+    return undefined==val || Array.isArray(val) ? val : (""+val).split(plainSep ? "," : MULTI_SPLIT_REGEX).map(function(itm) { return itm.trim() });
 }
 
 function splitMultiple(item, typeKey, idsKey, isGenre) {
@@ -1059,4 +1073,12 @@ function toolbarMouseDown(ev) {
     } else if (queryParams.nativeTitlebar>0) {
         emitNative("MATERIAL-TITLEBAR\nNAME " + (toggleMax ? "max" : "move"), queryParams.nativeTitlebar);
     }
+}
+
+function timeStr(date, lang) {
+    return date.toLocaleTimeString(lang, { hour: 'numeric', minute: 'numeric', hour12:lmsOptions.time12hr });
+}
+
+function dateStr(date, lang) {
+    return date.toLocaleDateString(lang, { weekday: 'short', month: 'short', day: 'numeric', year: undefined }).replace(", ", "  ");
 }

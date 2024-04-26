@@ -48,7 +48,7 @@ const LMS_MATERIAL_DEFAULT_ITEMS_PREF = "plugin.material-skin:items";
 const LMS_MATERIAL_DEFAULT_PINNED_PREF = "plugin.material-skin:pinned";
 const LMS_VOLUME_CLOSE_TIMEOUT = 10000;
 const LMS_QUEUE_CLOSE_TIMEOUT = 15*1000;
-const LMS_CACHE_VERSION = 1;
+const LMS_CACHE_VERSION = 2;
 const LMS_LIST_ELEMENT_SIZE = 50;
 const LMS_LIST_3LINE_ELEMENT_SIZE = 70;
 const LMS_ALBUM_QUEUE_HEADER = 68;
@@ -56,6 +56,8 @@ const LMS_ALBUM_QUEUE_TRACK = 34;
 const LMS_BLANK_COVER = "/music/0/cover";
 const DEFAULT_RADIO_COVER = "/material/html/images/noradio.png";
 const DEFAULT_COVER = "/material/html/images/nocover.png";
+const DEFAULT_WORKS_COVER = "/material/html/images/nowork.png";
+const RANDOMPLAY_COVER = "/material/html/images/randomplay.png";
 const LMS_DOUBLE_CLICK_TIMEOUT = 300;
 const LMS_VOLUME_DEBOUNCE = 250;
 const LMS_DARK_SVG = "edece7";
@@ -127,7 +129,7 @@ const ARTIST_TAGS = "tags:s";
 const ALBUM_TAGS = "tags:ajlqswyKS";
 const ALBUM_TAGS_ALL_ARTISTS = "tags:aajlqswyKSS";
 const ARTIST_ALBUM_TAGS = "tags:aajlqswyKRSSW";
-const TRACK_TAGS = "tags:dikstuAACGPS";
+const TRACK_TAGS = "tags:dikstyuAACGPS";
 const SEARCH_TRACK_TAGS = IS_MOBILE || LMS_VERSION<80400 ? "tags:dikstuAC" : "tags:dikstuAACS";
 const TECH_INFO_TAGS = "orITY";
 const PLAYLIST_TAGS = "tags:suxE";
@@ -148,7 +150,7 @@ const NP_EXPANDED = 'now-playing-expanded';
 const MAX_TRACKS_BEFORE_COLLAPSE = 200;
 const ALL_SONGS_ID = "allsongs";
 
-const ARTIST_TYPES = ["albumartist", "trackartist", "artist", "band", "composer", "conductor"];
+const ARTIST_TYPES = ["artist", "trackartist", "albumartist", "composer", "conductor", "band"];
 var MULTI_SPLIT_REGEX = ";"
 
 // Safari on iOS and macOS does not support lookbehind. Looks like it can't even parse the line
@@ -164,7 +166,7 @@ const IFRAME_HOME_NAVIGATES_BROWSE_HOME = 1
 const IFRAME_HOME_CLOSES_DIALOGS = 2
 
 const SKIN_GENRE_TAGS = ['composer', 'conductor', 'band'];
-const SKIN_BOOL_OPTS = ['showComposer', 'showConductor', 'showBand', 'showAllArtists', 'artistFirst', IS_IOS ? 'xx' : 'allowDownload', 'showComment', 'noArtistFilter', 'genreImages', 'touchLinks', 'yearInSub', 'playShuffle'];
+const SKIN_BOOL_OPTS = ['maiComposer', 'showComposer', 'showConductor', 'showBand', 'showAllArtists', 'artistFirst', IS_IOS ? 'xx' : 'allowDownload', 'showComment', 'noArtistFilter', 'genreImages', 'touchLinks', 'yearInSub', 'playShuffle'];
 const SKIN_INT_OPTS = ['respectFixedVol', 'commentAsDiscTitle', 'pagedBatchSize'];
 
 const MSK_REV_SORT_OPT = "msk-revsort:1";

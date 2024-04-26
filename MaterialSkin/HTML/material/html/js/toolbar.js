@@ -37,7 +37,7 @@ Vue.component('lms-toolbar', {
   <v-toolbar-title slot="activator" v-bind:class="{'link-item':!coloredToolbars && (!queryParams.single || !powerButton), 'link-item-ct': coloredToolbars && (!queryParams.single || !powerButton), 'maintoolbar-title-clock':showClock}">
    <v-icon v-if="noPlayer" class="maintoolbar-player-icon amber">warning</v-icon>
    <div class="maintoolbar-title ellipsis" v-bind:class="{'dimmed': !playerStatus.ison}">
-    {{noPlayer ? trans.noplayer : player.name}}<v-icon v-if="playerStatus.sleepTime" class="player-status-icon dimmed">hotel</v-icon><v-icon v-if="playerStatus.synced" class="player-status-icon dimmed">link</v-icon></div>
+    {{noPlayer ? trans.noplayer : player.name}}<v-icon v-if="playerStatus.sleepTime" class="player-status-icon dimmed">hotel</v-icon><v-icon v-if="playerStatus.alarmStr" class="player-status-icon dimmed">alarm</v-icon><v-icon v-if="playerStatus.synced" class="player-status-icon dimmed">link</v-icon></div>
    <div v-if="!desktopLayout && !noPlayer && MBAR_NONE==mobileBar" class="maintoolbar-subtitle subtext ellipsis" v-bind:class="{'dimmed' : !playerStatus.ison}">{{playerStatus.count<1 ? trans.nothingplaying : isNowPlayingPage ? queueInfo : npInfo}}</div>
   </v-toolbar-title>
        
@@ -80,6 +80,12 @@ Vue.component('lms-toolbar', {
     <v-list-tile-avatar><v-icon>hotel</v-icon></v-list-tile-avatar>
     <v-list-tile-content>
      <v-list-tile-title>{{playerStatus.sleepTime | displayTime}}</v-list-tile-title>
+    </v-list-tile-content>
+   </v-list-tile>
+   <v-list-tile v-if="playerStatus.alarmStr" @click="bus.$emit('dlg.open', 'playersettings', undefined, 'alarms')" class="hide-for-mini">
+    <v-list-tile-avatar><v-icon>alarm</v-icon></v-list-tile-avatar>
+    <v-list-tile-content>
+     <v-list-tile-title>{{playerStatus.alarmStr}}</v-list-tile-title>
     </v-list-tile-content>
    </v-list-tile>
   </v-list>
@@ -174,7 +180,7 @@ Vue.component('lms-toolbar', {
     `,
     data() {
         return { playlist: { count: "", duration: "" },
-                 playerStatus: { ison: 1, isplaying: false, volume: 0, synced: false, sleepTime: undefined, count:0 },
+                 playerStatus: { ison: 1, isplaying: false, volume: 0, synced: false, sleepTime: undefined, count:0, alarm: undefined, alarmStr: undefined },
                  npInfo: "...",
                  queueInfo: "...",
                  menuItems: [],
@@ -264,7 +270,16 @@ Vue.component('lms-toolbar', {
             if (vol != this.playerVolume) {
                 this.playerVolume = vol;
             }
-            this.playerId = ""+this.$store.state.player.id
+            this.playerId = ""+this.$store.state.player.id;
+            if (this.playerStatus.alarm!=playerStatus.alarm) {
+                if (undefined==playerStatus.alarm) {
+                    this.playerStatus.alarmStr = undefined;
+                } else {
+                    let alarmDate = new Date(playerStatus.alarm*1000);
+                    this.playerStatus.alarmStr = dateStr(alarmDate, this.$store.state.lang)+" "+timeStr(alarmDate, this.$store.state.lang);
+                }
+                this.playerStatus.alarm=playerStatus.alarm;
+            }
         }.bind(this));
         
         bus.$on('langChanged', function() {
@@ -665,9 +680,8 @@ Vue.component('lms-toolbar', {
         },
         updateClock() {
             var date = new Date();
-            this.date = date.toLocaleDateString(this.$store.state.lang, { weekday: 'short', month: 'short', day: 'numeric', year: undefined }).replace(", ", "  ");
-            this.time = date.toLocaleTimeString(this.$store.state.lang, { hour: 'numeric', minute: 'numeric' });
-
+            this.date = dateStr(date, this.$store.state.lang);
+            this.time = timeStr(date, this.$store.state.lang);
             if (undefined!==this.clockTimer) {
                 clearTimeout(this.clockTimer);
             }
@@ -802,7 +816,7 @@ Vue.component('lms-toolbar', {
             return showShortcut ? ttShortcutStr(str, shortcut, shift) : str;
         },
         playerShortcut: function(index) {
-            return IS_APPLE ? i18n("Option+%1", 9==index ? 0 : index+1) : i18n("Alt+%1", 9==index ? 0 : index+1);
+            return IS_APPLE ? ("⌥+"+(9==index ? 0 : index+1)) : i18n("Alt+%1", 9==index ? 0 : index+1);
         }
     },
     watch: {

@@ -72,46 +72,31 @@ function isTextItem(item) {
               (!item.command || (item.command[0]!="browsejive" && (item.command.length<2 || item.command[1]!="browsejive")))));
 }
 
-function shrinkJumplist(array, limit) {
+function shrinkJumplist(array, limit, totalItems) {
     if (array.length<=limit) {
         return array;
     }
-    let arr = array;
-    let hdrs = [];
-    if (array[0].key==SECTION_JUMP) {
-        arr = [];
-        for (let i=0, len=array.length; i<len; ++i) {
-            if (array[i].key==SECTION_JUMP) {
-                hdrs.push(array[i]);
-            } else {
-                arr.push(array[i]);
-            }
+
+    let remove = array.length - limit;
+    // Calculate weight for each entry
+    let items = [];
+    for (let i=0, len=array.length; i<len; ++i) {
+        if (array[i].key==SECTION_JUMP || 0==i) {
+            items.push({weight:-25000, pos:i, item:array[i]});
+        } else {
+            items.push({weight:-1*((i+1<len ? array[i+1].index : totalItems)-array[i].index), pos:i, item:array[i]});
         }
-        limit -= hdrs.length;
     }
-    var res = [];
-    var i = 0;
-    var scale = arr.length / limit;
-    while (i < limit) {
-        res.push(arr[Math.round(i * scale)]);
-        i++;
-    }
-    res[res.length-1]=arr[arr.length-1];
-    if (hdrs.length>0) {
-        let len = res.length;
-        let h = 0;
-        let hlen = hdrs.length;
-        let lastH = 0;
-        for (let i=0; i<len && h<hlen; ++i) {
-            if (res[i].index>hdrs[h].index) {
-                res.splice(i, 0, hdrs[h]);
-                lastH=h;
-                h++;
-            }
-        }
-        for (h=lastH+1; h<hlen; ++h) {
-            res.push(hdrs[h]);
-        }
+    // Sort by weight, so keys with feweset entries are at end
+    items.sort(function(a, b) { return a.weight!=b.weight ? a.weight<b.weight ? -1 : 1 : a.index<b.index ? -1 : 1 });
+    // Trim last few items so we get to correct size
+    items.splice(array.length-(1+remove), remove);
+    // Re-sort into original order
+    items.sort(function(a, b) { return a.pos<b.pos ? -1 : 1})
+    // Recreate list
+    let res = [];
+    for (let i=0, len=items.length; i<len; ++i) {
+        res.push(array[items[i].pos]);
     }
     return res;
 }
@@ -122,24 +107,34 @@ function updateItemFavorites(item) {
     }
 
     try {
-        var favTitle = item.origTitle ? item.origTitle : item.title;
-        if (item.id!=undefined && item.album_id!=undefined) {
+        var favTitle = item.favTitle ? item.favTitle : item.origTitle ? item.origTitle : item.title;
+        if (item.id.startsWith("work_id:") && item.images && item.images.length>1) {
+            let ids=[];
+            for (let i=0, list=item.images, len=list.length; i<len; ++i) {
+                ids.push(list[i].split('/')[list[i][0]=='/' ? 2 : 1]);
+            }
+            item.favIcon = changeImageSizing(item.images[item.images.length-1])+"?ids="+ids.reverse().join(",");
+        } else if (item.id!=undefined && item.album_id!=undefined) {
             item.favIcon="music/"+item.album_id+"/cover.png";
         } else if (item.id.startsWith("genre_id:")) {
             item.favUrl="db:genre.name="+encodeURIComponent(favTitle);
             item.favIcon="html/images/genres.png";
         } else if (item.id.startsWith("artist_id:")) {
-            item.favUrl="db:contributor.name="+encodeURIComponent(favTitle);
+            if (!item.favUrl) {
+                item.favUrl="db:contributor.name="+encodeURIComponent(favTitle);
+            }
             item.favIcon=changeImageSizing(item.image);
         } else if (item.id.startsWith("album_id:")) {
-            item.favUrl="db:album.title="+encodeURIComponent(favTitle);
-            if (LMS_VERSION>=80300) {
-                if (undefined!=item.extid) {
-                    item.favUrl=item.extid;
-                } else if (undefined!=item.artists && item.artists.length>0) {
-                    item.favUrl+="&contributor.name="+encodeURIComponent(item.artists[0]);
-                } else if (undefined!=item.subtitle) {
-                    item.favUrl+="&contributor.name="+encodeURIComponent(item.subtitle);
+            if (undefined==item.favUrl) {
+                item.favUrl="db:album.title="+encodeURIComponent(favTitle);
+                if (LMS_VERSION>=80300) {
+                    if (undefined!=item.extid) {
+                        item.favUrl=item.extid;
+                    } else if (undefined!=item.artists && item.artists.length>0) {
+                        item.favUrl+="&contributor.name="+encodeURIComponent(item.artists[0]);
+                    } else if (undefined!=item.subtitle) {
+                        item.favUrl+="&contributor.name="+encodeURIComponent(item.subtitle);
+                    }
                 }
             }
             item.favIcon=changeImageSizing(item.image);
@@ -156,8 +151,12 @@ function updateItemFavorites(item) {
             item.favIcon=item.infoParams.image;
         }
 
-        item.favUrl = item.favUrl ? item.favUrl : item.url;
-        item.favIcon = item.favIcon ? item.favIcon : item.image ? item.image : item.icon;
+        if (!item.favUrl && item.url) {
+            item.favUrl = item.url;
+        }
+        if (!item.favIcon) {
+            item.favIcon = item.images ? changeImageSizing(item.images[item.images.length-1]) : item.image ? changeImageSizing(item.image) : item.icon;
+        }
     } catch(e) {
     }
 }
@@ -171,11 +170,11 @@ function isInFavorites(item) {
 }
 
 function uniqueId(id, listSize) {
-    return id+"@index:"+listSize;
+    return id+"@index-"+listSize;
 }
 
 function originalId(id) {
-    return id.split("@index:")[0];
+    return id.split("@index-")[0];
 }
 
 function showMenu(obj, newMenu) {
@@ -256,7 +255,7 @@ function clearTextSelection() {
 function addAndPlayAllActions(cmd, items) {
     if (cmd.command[0]=="albums") {
         for (var i=0, len=cmd.params.length; i<len; ++i) {
-            if (cmd.params[i].startsWith("artist_id:") || cmd.params[i].startsWith("genre_id:") || cmd.params[i].startsWith("search:")) {
+            if (cmd.params[i].startsWith("artist_id:") || cmd.params[i].startsWith("genre_id:") || cmd.params[i].startsWith("search:") || cmd.params[i].startsWith("composer_id:")) {
                 return true;
             }
         }
@@ -381,8 +380,8 @@ function openServerSettings(serverName, showHome, path) {
                     ? '/material/settings/server/basic.html'
                     : path;
     bus.$emit('dlg.open', 'iframe', pathToUse, TB_SERVER_SETTINGS.title+(serverName ? SEPARATOR+serverName : ""),
-            [{title:i18n('Shutdown'), text:i18n('Stop Logitech Media Server?'), icon:'power_settings_new', cmd:['stopserver'], confirm:i18n('Shutdown')},
-             {title:i18n('Restart'), text:i18n('Restart Logitech Media Server?'), icon:'refresh', cmd:['restartserver'], confirm:i18n('Restart')}], showHome);
+            [{title:i18n('Shutdown'), text:i18n('Stop %1?', LMS_WINDOW_TITLE), icon:'power_settings_new', cmd:['stopserver'], confirm:i18n('Shutdown')},
+             {title:i18n('Restart'), text:i18n('Restart %1?', LMS_WINDOW_TITLE), icon:'refresh', cmd:['restartserver'], confirm:i18n('Restart')}], showHome);
 }
 
 function getYear(text) {
@@ -462,10 +461,12 @@ function inRect(x, y, rx, ry, rw, rh, padding) {
 
 const ALBUM_SORT_KEY = "albumSort";
 const ARTIST_ALBUM_SORT_KEY = "artistAlbumSort";
+const WORK_ALBUM_SORT_KEY = "workAlbumSort";
 
 function commandAlbumSortKey(command, genre) {
     var isArtist = false;
     var isCompilation = false;
+    var isWorks = false;
     [command.params, command.command].forEach(list => {
         for (var i=0, len=list.length; i<len; ++i) {
             let val = ""+list[i];
@@ -473,11 +474,13 @@ function commandAlbumSortKey(command, genre) {
                 isArtist = true;
             } else if (val=="compilation:1") {
                 isCompilation = true;
+            } else if (val.startsWith("work_id:")) {
+                isWorks = true;
             }
         }
     });
-    var baseSort = isArtist && !isCompilation ? ARTIST_ALBUM_SORT_KEY : ALBUM_SORT_KEY;
-    if (undefined!=genre && (lmsOptions.composerGenres.has(genre)) || lmsOptions.conductorGenres.has(genre) || lmsOptions.bandGenres.has(genre)) {
+    var baseSort = isWorks ? WORK_ALBUM_SORT_KEY : isArtist && !isCompilation ? ARTIST_ALBUM_SORT_KEY : ALBUM_SORT_KEY;
+    if (!isWorks && undefined!=genre && (lmsOptions.composerGenres.has(genre)) || lmsOptions.conductorGenres.has(genre) || lmsOptions.bandGenres.has(genre)) {
         return baseSort+"C";
     }
     return baseSort;
@@ -502,7 +505,7 @@ function setAlbumSort(command, genre, sort, reverse) {
 }
 
 function getTrackSort(stdItem) {
-    let key = stdItem==STD_ITEM_COMPOSITION_TRACKS ? "compositionTrackSort" : "trackSort";
+    let key = stdItem==STD_ITEM_COMPOSITION_TRACKS ? "compositionTrackSort" : stdItem==STD_ITEM_WORK ? "workTrackSort" : "trackSort";
     let def = "yearalbumtrack";
     let parts = getLocalStorageVal(key, def).split(".");
     let val = {by:parts[0], rev:parts.length>1};
@@ -603,6 +606,18 @@ function artistTitleSort(a, b) {
     return albumTrackSort(a, b);
 }
 
+function titleArtistSort(a, b) {
+    let s = fixedSort(removeTrackNum(a.title), removeTrackNum(b.title));
+    if (s!=0) {
+        return s;
+    }
+    s = fixedSort(getArtist(a), getArtist(b));
+    if (s!=0) {
+        return s;
+    }
+    return albumTrackSort(a, b);
+}
+
 function yearTitleSort(a, b) {
     let va=a.year ? a.year : 0;
     let vb=b.year ? b.year : 0;
@@ -613,6 +628,10 @@ function yearTitleSort(a, b) {
         return 1;
     }
     let s = fixedSort(removeTrackNum(a.title), removeTrackNum(b.title));
+    if (s!=0) {
+        return s;
+    }
+    s = fixedSort(getArtist(a), getArtist(b));
     if (s!=0) {
         return s;
     }

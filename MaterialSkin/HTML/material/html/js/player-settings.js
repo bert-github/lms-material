@@ -7,6 +7,7 @@
 'use strict';
 
 var DAYS_OF_WEEK = ['Sun', 'Mon', 'Tues', 'Weds', 'Thurs', 'Fri', 'Sat'];
+const CURRENT_PLAYLIST = 'CURRENT_PLAYLIST'
 
 Vue.component('lms-player-settings', {
     template: `
@@ -138,7 +139,7 @@ Vue.component('lms-player-settings', {
 
      <div v-if="libraries.length>1" class="dialog-padding"></div>
      <v-header v-if="libraries.length>1" class="dialog-section-header">{{i18n('Library')}}</v-header>
-     <v-list-tile class="settings-note" v-if="libraries.length>1"><p>{{i18n("Each player may be assigned a 'virtual' library. If set then this will be used to restrict song selection for 'Random Mix' (only songs from the chosen library will be used), and other modes. This setting might also affect library browsing with other LMS control points (such as the default web UI).")}}<br/><br/>{{i18n("Please note, the setting here will not affect this control point. To change the library of this control point you need to use the context menu button for 'My Music', or use the 'Change library' button when browsing 'My Music'")}}</p></v-list-tile>
+     <v-list-tile class="settings-note" v-if="libraries.length>1"><p>{{i18n("Each player may be assigned a 'virtual' library. If set then this will be used to restrict song selection for 'Random Mix' (only songs from the chosen library will be used), and other modes. This setting might also affect library browsing with other Lyrion control points (such as the default web UI).")}}<br/><br/>{{i18n("Please note, the setting here will not affect this control point. To change the library of this control point you need to use the context menu button for 'My Music', or use the 'Change library' button when browsing 'My Music'")}}</p></v-list-tile>
      <v-list-tile v-if="libraries.length>1">
       <v-select :items="libraries" :label="i18n('Library')" v-model="library" item-text="name" item-value="id"></v-select>
      </v-list-tile>
@@ -231,11 +232,9 @@ Vue.component('lms-player-settings', {
      <v-select :items="alarmSounds" :label="i18n('Sound')" v-model="alarmDialog.url" item-text="label" item-value="key"></v-select>
     </v-list-tile>
 
-    <!-- TODO ????
     <v-list-tile class="settings-compact-row">
-     <v-select :items="alarmShuffeItems" :label="i18n('Shuffle')" v-model="alarmDialog.shuffle" item-text="label" item-value="key"></v-select>
+     <v-select :items="alarmShuffeItems" :label="i18n('Shuffle')" v-model="alarmDialog.shufflemode" item-text="label" item-value="key"></v-select>
     </v-list-tile>
-    -->
     <v-list-tile>
      <v-list-tile-content @click="alarmDialog.repeat = !alarmDialog.repeat" class="switch-label">
       <v-list-tile-title>{{i18n('Repeat')}}</v-list-tile-title>
@@ -310,7 +309,7 @@ Vue.component('lms-player-settings', {
                 dow: [],
                 repeat: false,
                 url: undefined,
-                shuffle: undefined
+                shufflemode: undefined
             },
             wide:1,
             trans:{dstm:undefined},
@@ -510,7 +509,7 @@ Vue.component('lms-player-settings', {
             });
             lmsCommand(this.playerId, ["playerpref", "alarmDefaultVolume", "?"]).then(({data}) => {
                 if (data && data.result && undefined!=data.result._p2) {
-                    this.alarms.volume=this.orig.alarms.volume=data.result._p2;
+                    this.alarms.volume=this.orig.alarms.volume=parseInt(data.result._p2);
                 }
             });
             this.alarmSounds=[];
@@ -519,14 +518,14 @@ Vue.component('lms-player-settings', {
                 if (data && data.result && data.result.item_loop) {
                     data.result.item_loop.forEach(i => {
                         if (!i.url) {
-                            this.alarmSounds.push({key:'CURRENT_PLAYLIST', label:i18n('Current play queue')});
+                            this.alarmSounds.push({key:CURRENT_PLAYLIST, label:i18n('Current play queue')});
                         } else {
                             this.alarmSounds.push({key:i.url, label:i.category+": "+i.title});
                         }
                     });
                 }
                 if (this.alarmSounds.length<1) {
-                    this.alarmSounds.push({key:'CURRENT_PLAYLIST', label:i18n('Current play queue')});
+                    this.alarmSounds.push({key:CURRENT_PLAYLIST, label:i18n('Current play queue')});
                 }
                 this.loadAlarms();
             });
@@ -633,25 +632,25 @@ Vue.component('lms-player-settings', {
             if (this.orig.library!=this.library && !isNull(this.library)) {
                 lmsCommand(this.playerId, ["material-skin-client", "set-lib", "id:"+this.library]);
             }
-            if (this.orig.crossfade!=this.crossfade && !isNull(this.crossfade)) {
+            if (this.orig.crossfade!=this.crossfade && !isNull(this.crossfade) && !isNaN(this.crossfade)) {
                 lmsCommand(this.playerId, ["playerpref", "transitionType", this.crossfade]);
             }
             if (this.orig.smartCrossfade!=this.smartCrossfade && !isNull(this.smartCrossfade)) {
                 lmsCommand(this.playerId, ["playerpref", "transitionSmart", this.smartCrossfade ? 1 : 0]);
             }
-            if (this.orig.replaygain!=this.replaygain && !isNull(this.replaygain)) {
+            if (this.orig.replaygain!=this.replaygain && !isNull(this.replaygain) && !isNaN(this.replaygain)) {
                 lmsCommand(this.playerId, ["playerpref", "replayGainMode", this.replaygain]);
             }
             if (this.orig.alarms.fade!=this.alarms.fade && !isNull(this.alarms.fade)) {
                 lmsCommand(this.playerId, ["playerpref", "alarmfadeseconds", this.alarms.fade ? 1 : 0]);
             }
-            if (this.orig.alarms.timeout!=this.alarms.timeout && !isNull(this.alarms.timeout)) {
+            if (this.orig.alarms.timeout!=this.alarms.timeout && !isNull(this.alarms.timeout) && !isNaN(this.alarms.timeout)) {
                 lmsCommand(this.playerId, ["playerpref", "alarmTimeoutSeconds", this.alarms.timeout*60]);
             }
-            if (this.orig.alarms.snooze!=this.alarms.snooze && !isNull(this.alarms.snooze)) {
+            if (this.orig.alarms.snooze!=this.alarms.snooze && !isNull(this.alarms.snooze) && !isNaN(this.alarms.snooze)) {
                 lmsCommand(this.playerId, ["playerpref", "alarmSnoozeSeconds", this.alarms.snooze*60]);
             }
-            if (this.orig.alarms.volume!=this.alarms.volume && !isNull(this.alarms.volume)) {
+            if (this.orig.alarms.volume!=this.alarms.volume && !isNull(this.alarms.volume) && !isNaN(this.alarms.volume)) {
                 lmsCommand(this.playerId, ["playerpref", "alarmDefaultVolume", this.alarms.volume]);
             }
 
@@ -669,6 +668,10 @@ Vue.component('lms-player-settings', {
                 setLocalStorageVal("playerIdIconMap", JSON.stringify(playerIdIconMap));
             }
 
+            // Update current player
+            if (this.playerId==this.$store.state.player.id) {
+                bus.$emit("updatePlayer", this.$store.state.player.id);
+            }
             this.playerIconUpdate = undefined;
             this.playerId = undefined;
         },
@@ -680,6 +683,7 @@ Vue.component('lms-player-settings', {
                         i.enabled = 1 == i.enabled;
                         i.origEnabled = 1 == i.enabled;
                         i.repeat = 1 == i.repeat;
+                        i.shufflemode = undefined==i.shufflemode ? 0 : parseInt(i.shufflemode);
                         this.alarms.scheduled.push(i);
                     });
                 }
@@ -702,12 +706,12 @@ Vue.component('lms-player-settings', {
         addAlarm(event) {
             storeClickOrTouchPos(event);
             this.alarmDialog = { show: true, id: undefined, time: "00:00", dow:["1", "2", "3", "4", "5"], repeat: false,
-                                 url: 'CURRENT_PLAYLIST', shuffle: this.alarmShuffeItems[0].key };
+                                 url: CURRENT_PLAYLIST, shufflemode: this.alarmShuffeItems[0].key };
         },
         editAlarm(alarm, event) {
             storeClickOrTouchPos(event);
             this.alarmDialog = { show: true, id: alarm.id, time: formatTime(alarm.time, true), dow: alarm.dow.split(","),
-                                 repeat: alarm.repeat, url: alarm.url, enabled: alarm.enabled };
+                                 repeat: alarm.repeat, url: alarm.url, shufflemode: alarm.shufflemode, enabled: alarm.enabled };
         },
         saveAlarm() {
             var parts = this.alarmDialog.time.split(":");
@@ -724,9 +728,9 @@ Vue.component('lms-player-settings', {
 
             cmd.push("time:"+time);
             cmd.push("dow:"+this.alarmDialog.dow.join(","));
-            cmd.push("url:"+this.alarmDialog.url); // TODO CHECK!!!
+            cmd.push("url:"+(CURRENT_PLAYLIST==this.alarmDialog.url ? "0" : this.alarmDialog.url));
             cmd.push("repeat:"+(this.alarmDialog.repeat ? 1 : 0));
-            // TODO: shuffle???
+            cmd.push("shufflemode:"+this.alarmDialog.shufflemode);
             lmsCommand(this.playerId, cmd).then(({data}) => {
                 this.loadAlarms();
             });

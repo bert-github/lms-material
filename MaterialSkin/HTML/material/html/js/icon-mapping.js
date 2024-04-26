@@ -152,6 +152,12 @@ function mapIcon(item, app, fallback) {
     if (undefined==iconMap) {
         return false;
     }
+    if (undefined!=item.presetParams && undefined!=item.presetParams.favorites_url && item.presetParams.favorites_url.startsWith("db:work.title") && undefined==item.presetParams.icon) {
+        item.icon=undefined;
+        item.image=undefined;
+        item.svg="release-work";
+        return true;
+    }
     if (mapIconType(item, app, "icon-id")) {
         return true;
     }
@@ -179,4 +185,14 @@ function mapIcon(item, app, fallback) {
         item.icon=undefined;
     }
     return false;
+}
+
+function releaseTypeIcon(rel) {
+    return rel==undefined
+        ? {svg:"release"}
+        : rel=="ALBUM"
+            ? {icon:"album"}
+            : rel=="COMPILATION"
+                ? {svg:"album-multi"}
+                : {svg:"release-"+rel.toLowerCase().replace(/[^0-9a-z]/gi, '')};
 }

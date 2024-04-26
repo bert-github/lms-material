@@ -133,7 +133,8 @@
  height:calc(var(--100vh) - (var(--main-toolbar-height) + var(--sub-toolbar-height) + var(--bottom-toolbar-height) + var(--mobile-npbar-height)));
  width:100vw;
  backface-visibility:hidden;
- overflow:auto;
+ overflow-y:auto;
+ overflow-x:hidden !important;
  margin:0px;
 }
 
@@ -229,6 +230,7 @@
 .np-bar-mob-thick .np-bar-image .np-cover {
  height:43px;
  width:43px;
+ cursor:unset;
 }
 
 .np-bar-mob-thick .v-list__tile__title {
@@ -287,7 +289,7 @@
 .np-bar-mob-thick .np-bar-details {
  left:34px!important;
  width:calc(100vw - 58px);
- bottom:calc(var(--bottom-nav-pad) + 32px);
+ bottom:calc(var(--bottom-toolbar-height) - 20px);
 }
 
 /* Adjust link/more/close buttons in now-playing page up a little */
@@ -361,9 +363,9 @@
   margin-right:-23px !important;
  }
 
-.settings-title {
- margin:0px -12px 0px -6px!important;
-}
+ .settings-title {
+  margin:0px -12px 0px -6px!important;
+ }
 
  /* Adjust dialog toolbar, so that menu icon aligns with main menu icon */
  .dialog-toolbar > .v-toolbar__content {
@@ -416,6 +418,9 @@
  }
  .queue-action {
   margin-right:-14px;
+ }
+ .pq-rating {
+  right:12px;
  }
 }
 

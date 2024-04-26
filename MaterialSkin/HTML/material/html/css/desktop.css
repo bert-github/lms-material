@@ -156,7 +156,7 @@
 }
 
 .np-bgnd {
- height:calc(var(--100vh) - var(--main-toolbar-height));
+ height:calc((var(--100vh) + (2* var(--np-bgnd-filter-size))) - var(--main-toolbar-height));
 }
 
 .np-portrait-song-info {
@@ -184,6 +184,12 @@
  min-width:600px;
 }
 
+.np-bar-queue {
+ margin:-8px -6px -6px -3px!important;
+ height:28px;
+ width:28px;
+}
+
 .np-bar-controls {
  margin-left:-16px;
  margin-top:15px;
@@ -201,7 +207,7 @@
  background:transparent!important;
 }
 
-.np-bar-image {
+.np-bar-image { 
  position:fixed;
  left:162px;
  bottom:1px;

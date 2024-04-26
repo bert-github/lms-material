@@ -70,7 +70,7 @@ const SHOW_IMAGE_ACTION       = 54;
 const PQ_SORT_ACTION          = 55;
 const PLAYLIST_SORT_ACTION    = 56;
 const PQ_SAVE_ACTION          = 57;
-const SCROLL_TO_DISC_ACTION   = 58;
+const SCROLL_TO_ACTION        = 58;
 const PQ_TOGGLE_VIEW_ACTION   = 59;
 const TRACK_SORTS_ACTION      = 60;
 const PLAY_SHUFFLE_ACTION     = 61;
@@ -168,6 +168,7 @@ function updateActionStrings() {
     ACTIONS[ADD_ACTION].short=ACTIONS[ADD_ALL_ACTION].short=i18n("Append");
     ACTIONS[ADD_ACTION].skey=ACTIONS[ADD_ALL_ACTION].key=LMS_APPEND_KEYBOARD;
     ACTIONS[ADD_RANDOM_ALBUM_ACTION].title=lmsOptions.supportReleaseTypes ? i18n("Append random release to queue") : i18n("Append random album to queue");
+    ACTIONS[ADD_RANDOM_ALBUM_ACTION].svg = lmsOptions.supportReleaseTypes ? 'dice-release' : 'dice-album';
     ACTIONS[INSERT_ACTION].title=ACTIONS[INSERT_ALL_ACTION].title=i18n("Play next");
     ACTIONS[INSERT_ACTION].short=ACTIONS[INSERT_ALL_ACTION].short=i18n("Next");
     ACTIONS[MORE_ACTION].title=i18n("More");
@@ -232,10 +233,21 @@ function updateActionStrings() {
     ACTIONS[PLAYLIST_SORT_ACTION].title=i18n("Sort tracks");
     ACTIONS[PQ_SAVE_ACTION].title=i18n("Save queue");
     ACTIONS[PQ_SAVE_ACTION].key=LMS_SAVE_QUEUE_KEYBOARD;
-    ACTIONS[SCROLL_TO_DISC_ACTION].title=i18n('Scroll to disc');
+    ACTIONS[SCROLL_TO_ACTION].title=i18n('Scroll to');
     ACTIONS[PQ_TOGGLE_VIEW_ACTION].title=i18n("Toggle view");
 
     ACTIONS[COPY_ACTION].title=i18n("Copy");
     ACTIONS[SEARCH_LIST_ACTION].title=i18n("Search within list");
     ACTIONS[SEARCH_LIST_ACTION].key=LMS_SEARCH_KEYBOARD;
+
+    let albumActs = [GOTO_ALBUM_ACTION, PLAY_ALBUM_ACTION, PQ_REMOVE_ALBUM_ACTION, PQ_TOGGLE_VIEW_ACTION];
+    for (let i=0, len=albumActs.length; i<len; ++i) {
+        if (lmsOptions.supportReleaseTypes) {
+            ACTIONS[albumActs[i]].icon=undefined;
+            ACTIONS[albumActs[i]].svg="release";
+        } else {
+            ACTIONS[albumActs[i]].icon="album";
+            ACTIONS[albumActs[i]].svg=undefined;
+        }
+    }
 }
